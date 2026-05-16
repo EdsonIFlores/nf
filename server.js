@@ -2,6 +2,7 @@ const http = require("node:http");
 const fs = require("node:fs");
 const fsp = require("node:fs/promises");
 const path = require("node:path");
+const crypto = require("node:crypto");
 const { URL } = require("node:url");
 const { ImapFlow } = require("imapflow");
 const { simpleParser } = require("mailparser");
@@ -10,6 +11,7 @@ const PORT = Number(process.env.PORT || 8787);
 const HOST = process.env.HOST || "0.0.0.0";
 const ROOT = __dirname;
 const OUTPUT_DIR = path.resolve(process.env.OUTPUT_DIR || path.join(ROOT, "NotasFiscais"));
+const INDEX_FILE = path.join(OUTPUT_DIR, ".arquivo-claro-index.json");
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -123,6 +125,117 @@ function providerFromEmail(email) {
   return null;
 }
 
+function crc32(buffer) {
+  let crc = 0xffffffff;
+  for (const byte of buffer) {
+    crc ^= byte;
+    for (let i = 0; i < 8; i += 1) {
+      crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function dosDateTime(date = new Date()) {
+  const year = Math.max(date.getFullYear(), 1980);
+  const dosTime = (date.getHours() << 11) | (date.getMinutes() << 5) | Math.floor(date.getSeconds() / 2);
+  const dosDate = ((year - 1980) << 9) | ((date.getMonth() + 1) << 5) | date.getDate();
+  return { dosTime, dosDate };
+}
+
+function makeZip(entries) {
+  const localParts = [];
+  const centralParts = [];
+  let offset = 0;
+
+  for (const entry of entries) {
+    const nameBuffer = Buffer.from(entry.name.replace(/\\/g, "/"), "utf8");
+    const data = entry.data;
+    const checksum = crc32(data);
+    const { dosTime, dosDate } = dosDateTime(entry.date || new Date());
+
+    const localHeader = Buffer.alloc(30);
+    localHeader.writeUInt32LE(0x04034b50, 0);
+    localHeader.writeUInt16LE(20, 4);
+    localHeader.writeUInt16LE(0x0800, 6);
+    localHeader.writeUInt16LE(0, 8);
+    localHeader.writeUInt16LE(dosTime, 10);
+    localHeader.writeUInt16LE(dosDate, 12);
+    localHeader.writeUInt32LE(checksum, 14);
+    localHeader.writeUInt32LE(data.length, 18);
+    localHeader.writeUInt32LE(data.length, 22);
+    localHeader.writeUInt16LE(nameBuffer.length, 26);
+    localHeader.writeUInt16LE(0, 28);
+
+    localParts.push(localHeader, nameBuffer, data);
+
+    const centralHeader = Buffer.alloc(46);
+    centralHeader.writeUInt32LE(0x02014b50, 0);
+    centralHeader.writeUInt16LE(20, 4);
+    centralHeader.writeUInt16LE(20, 6);
+    centralHeader.writeUInt16LE(0x0800, 8);
+    centralHeader.writeUInt16LE(0, 10);
+    centralHeader.writeUInt16LE(dosTime, 12);
+    centralHeader.writeUInt16LE(dosDate, 14);
+    centralHeader.writeUInt32LE(checksum, 16);
+    centralHeader.writeUInt32LE(data.length, 20);
+    centralHeader.writeUInt32LE(data.length, 24);
+    centralHeader.writeUInt16LE(nameBuffer.length, 28);
+    centralHeader.writeUInt16LE(0, 30);
+    centralHeader.writeUInt16LE(0, 32);
+    centralHeader.writeUInt16LE(0, 34);
+    centralHeader.writeUInt16LE(0, 36);
+    centralHeader.writeUInt32LE(0, 38);
+    centralHeader.writeUInt32LE(offset, 42);
+    centralParts.push(centralHeader, nameBuffer);
+
+    offset += localHeader.length + nameBuffer.length + data.length;
+  }
+
+  const centralSize = centralParts.reduce((total, part) => total + part.length, 0);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(0, 4);
+  end.writeUInt16LE(0, 6);
+  end.writeUInt16LE(entries.length, 8);
+  end.writeUInt16LE(entries.length, 10);
+  end.writeUInt32LE(centralSize, 12);
+  end.writeUInt32LE(offset, 16);
+  end.writeUInt16LE(0, 20);
+
+  return Buffer.concat([...localParts, ...centralParts, end]);
+}
+
+async function readIndex() {
+  try {
+    return JSON.parse(await fsp.readFile(INDEX_FILE, "utf8"));
+  } catch {
+    return { hashes: {} };
+  }
+}
+
+async function writeIndex(index) {
+  await fsp.mkdir(OUTPUT_DIR, { recursive: true });
+  await fsp.writeFile(INDEX_FILE, JSON.stringify(index, null, 2));
+}
+
+function detectDocumentKind({ fileName, subject, type, xmlMetadata }) {
+  const text = `${fileName || ""} ${subject || ""}`.toLowerCase();
+  if (text.includes("boleto") || text.includes("fatura") || text.includes("cobranca") || text.includes("cobrança") || text.includes("pix")) {
+    return { kind: "Boleto", category: "Financeiro", folder: "Boletos" };
+  }
+  if (type === "xml" || xmlMetadata?.key || text.includes("nfe") || text.includes("nf-e") || text.includes("nota")) {
+    return { kind: "Nota fiscal", category: "Fiscal", folder: "Notas Fiscais" };
+  }
+  return { kind: "Documento", category: "Outros", folder: "Outros" };
+}
+
+function dayFromDate(value) {
+  const date = value ? new Date(value) : new Date();
+  if (Number.isNaN(date.getTime())) return new Date().toISOString().slice(0, 10);
+  return date.toISOString().slice(0, 10);
+}
+
 function resolveConfig(input) {
   const preset = PROVIDERS[input.provider] || providerFromEmail(input.email) || {};
   return {
@@ -154,38 +267,69 @@ async function saveAttachment(attachment, mail, config) {
 
   const type = ext.slice(1);
   const xmlMetadata = type === "xml" ? readXmlMetadata(attachment.content) : {};
+  const hash = crypto.createHash("sha256").update(attachment.content).digest("hex");
+  const index = await readIndex();
+  if (index.hashes[hash]) {
+    return { duplicate: true, existing: index.hashes[hash] };
+  }
+
   const supplier =
     xmlMetadata.client ||
     mail.from?.value?.[0]?.name ||
     mail.from?.value?.[0]?.address ||
     "Fornecedor sem nome";
   const messageDate = mail.date ? new Date(mail.date) : new Date();
+  const receivedDay = dayFromDate(messageDate);
   const period =
     xmlMetadata.period ||
     `${messageDate.getFullYear()}-${String(messageDate.getMonth() + 1).padStart(2, "0")}`;
-  const folder = path.join(OUTPUT_DIR, sanitizeFolderName(supplier, "Fornecedor sem nome"), sanitizeFolderName(period, "Sem data"));
+  const document = detectDocumentKind({
+    fileName: attachment.filename,
+    subject: mail.subject,
+    type,
+    xmlMetadata,
+  });
+  const folder = path.join(
+    OUTPUT_DIR,
+    sanitizeFolderName(supplier, "Fornecedor sem nome"),
+    sanitizeFolderName(period, "Sem data"),
+    document.folder,
+  );
   await fsp.mkdir(folder, { recursive: true });
 
-  const filePath = await uniquePath(folder, attachment.filename || `nota-fiscal.${type}`);
+  const baseName = sanitizeFileName(attachment.filename || `${document.folder}.${type}`);
+  const filePath = await uniquePath(folder, `${receivedDay} - ${baseName}`);
   await fsp.writeFile(filePath, attachment.content);
 
-  return {
+  const record = {
     id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
     name: path.basename(filePath),
     type,
+    documentKind: document.kind,
     size: attachment.size || attachment.content.length,
     importedAt: new Date().toISOString(),
+    receivedAt: receivedDay,
     originalPath: filePath,
     fileUrl: toFileUrl(filePath),
     client: supplier,
     period,
-    category: "Fiscal",
+    category: document.category,
     status: "pendente",
-    tags: `email, nota fiscal, ${type}`,
+    tags: `email, ${document.kind.toLowerCase()}, ${type}`,
     cnpj: xmlMetadata.cnpj || "",
     key: xmlMetadata.key || "",
+    hash,
+    vobiReady: true,
     notes: `Importado do e-mail ${config.email}. Assunto: ${mail.subject || "sem assunto"}`,
   };
+
+  index.hashes[hash] = {
+    name: record.name,
+    path: filePath,
+    importedAt: record.importedAt,
+  };
+  await writeIndex(index);
+  return record;
 }
 
 async function importFromEmail(input) {
@@ -206,22 +350,27 @@ async function importFromEmail(input) {
   });
 
   const records = [];
+  let duplicates = 0;
   let checked = 0;
 
   await client.connect();
   try {
     const lock = await client.getMailboxLock(config.mailbox);
     try {
-      const search = config.unreadOnly ? { seen: false } : {};
+      const search = config.unreadOnly ? { unseen: true } : {};
       const uids = await client.search(search);
       const latest = uids.slice(-config.limit);
       if (latest.length) {
-        for await (const message of client.fetch(latest, { source: true, envelope: true, uid: true })) {
+        for await (const message of client.fetch(latest, { source: true, envelope: true, flags: true, uid: true })) {
+          if (config.unreadOnly && message.flags?.has("\\Seen")) {
+            continue;
+          }
           checked += 1;
           const mail = await simpleParser(message.source);
           for (const attachment of mail.attachments || []) {
             const record = await saveAttachment(attachment, mail, config);
-            if (record) records.push(record);
+            if (record?.duplicate) duplicates += 1;
+            else if (record) records.push(record);
           }
           if (config.markSeen) {
             await client.messageFlagsAdd(message.uid, ["\\Seen"], { uid: true });
@@ -240,8 +389,49 @@ async function importFromEmail(input) {
     outputDir: OUTPUT_DIR,
     checked,
     imported: records.length,
+    duplicates,
     files: records,
   };
+}
+
+async function exportVobiPackage(input) {
+  const files = Array.isArray(input.files) ? input.files : [];
+  const entries = [];
+  const manifest = [];
+
+  for (const file of files) {
+    const requested = path.resolve(file.originalPath || "");
+    if (!requested.startsWith(OUTPUT_DIR)) continue;
+    try {
+      const data = await fsp.readFile(requested);
+      const supplier = sanitizeFolderName(file.client, "Fornecedor sem nome");
+      const period = sanitizeFolderName(file.period, "Sem data");
+      const kind = sanitizeFolderName(file.documentKind || file.category || "Documento", "Documento");
+      const name = sanitizeFileName(path.basename(requested));
+      const zipPath = `${supplier}/${period}/${kind}/${name}`;
+      entries.push({ name: zipPath, data, date: new Date(file.importedAt || Date.now()) });
+      manifest.push({
+        arquivo: name,
+        fornecedor: file.client || "",
+        periodo: file.period || "",
+        tipo: file.type || "",
+        documento: file.documentKind || "",
+        cnpj: file.cnpj || "",
+        chave: file.key || "",
+        caminho: zipPath,
+      });
+    } catch {
+      // Ignore files that are no longer present on the server.
+    }
+  }
+
+  entries.push({
+    name: "manifesto-vobi.json",
+    data: Buffer.from(JSON.stringify(manifest, null, 2), "utf8"),
+    date: new Date(),
+  });
+
+  return makeZip(entries);
 }
 
 async function serveStatic(req, res, url) {
@@ -270,6 +460,17 @@ async function handle(req, res) {
       const body = await parseBody(req);
       const result = await importFromEmail(body);
       return send(res, 200, result);
+    }
+
+    if (url.pathname === "/api/export/vobi" && req.method === "POST") {
+      const body = await parseBody(req);
+      const zip = await exportVobiPackage(body);
+      res.writeHead(200, {
+        "Content-Type": "application/zip",
+        "Content-Disposition": "attachment; filename=\"pacote-vobi.zip\"",
+        "Access-Control-Allow-Origin": "*",
+      });
+      return res.end(zip);
     }
 
     if (url.pathname === "/api/file") {

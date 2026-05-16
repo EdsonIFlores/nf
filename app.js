@@ -24,6 +24,8 @@ const els = {
   pdfCount: document.querySelector("#pdfCount"),
   xmlCount: document.querySelector("#xmlCount"),
   pendingCount: document.querySelector("#pendingCount"),
+  supplierCount: document.querySelector("#supplierCount"),
+  billCount: document.querySelector("#billCount"),
   resultCount: document.querySelector("#resultCount"),
   tableBody: document.querySelector("#fileTableBody"),
   emptyState: document.querySelector("#emptyState"),
@@ -40,6 +42,7 @@ const els = {
   clientInput: document.querySelector("#clientInput"),
   periodInput: document.querySelector("#periodInput"),
   statusInput: document.querySelector("#statusInput"),
+  documentKindInput: document.querySelector("#documentKindInput"),
   categoryInput: document.querySelector("#categoryInput"),
   tagsInput: document.querySelector("#tagsInput"),
   cnpjInput: document.querySelector("#cnpjInput"),
@@ -50,6 +53,7 @@ const els = {
   duplicateBtn: document.querySelector("#duplicateBtn"),
   deleteBtn: document.querySelector("#deleteBtn"),
   exportCsvBtn: document.querySelector("#exportCsvBtn"),
+  exportVobiBtn: document.querySelector("#exportVobiBtn"),
   exportJsonBtn: document.querySelector("#exportJsonBtn"),
   importJsonInput: document.querySelector("#importJsonInput"),
   copyPlanBtn: document.querySelector("#copyPlanBtn"),
@@ -157,6 +161,13 @@ function inferCategory(file, type) {
   return "Outros";
 }
 
+function inferDocumentKind(file, type) {
+  const name = file.name.toLowerCase();
+  if (name.includes("boleto") || name.includes("fatura") || name.includes("cobranca") || name.includes("cobrança") || name.includes("pix")) return "Boleto";
+  if (type === "xml" || name.includes("nfe") || name.includes("nf-e") || name.includes("nota")) return "Nota fiscal";
+  return "Documento";
+}
+
 function inferPeriodFromDate(value) {
   if (!value) return "";
   const date = new Date(value);
@@ -197,6 +208,7 @@ async function buildRecord(file) {
     originalPath: file.webkitRelativePath || file.name,
     client: "",
     period: "",
+    documentKind: inferDocumentKind(file, type),
     category: inferCategory(file, type),
     status: "pendente",
     tags: type === "xml" ? "xml" : "pdf",
@@ -243,9 +255,8 @@ function suggestedPath(file) {
   const client = cleanFolderName(file.client, "Sem cliente");
   const period = cleanFolderName(file.period, "Sem periodo");
   const category = cleanFolderName(file.category, "Outros");
-  const status = cleanFolderName(file.status, "pendente");
-  const type = file.type.toUpperCase();
-  return `${client}/${period}/${category}/${type}/${status}/${file.name}`;
+  const documentKind = cleanFolderName(file.documentKind || category, "Documento");
+  return `${client}/${period}/${documentKind}/${file.name}`;
 }
 
 function filteredFiles() {
@@ -255,6 +266,7 @@ function filteredFiles() {
       file.name,
       file.client,
       file.period,
+      file.documentKind,
       file.category,
       file.status,
       file.tags,
@@ -280,6 +292,8 @@ function renderSummary(files) {
   els.pdfCount.textContent = state.files.filter((file) => file.type === "pdf").length;
   els.xmlCount.textContent = state.files.filter((file) => file.type === "xml").length;
   els.pendingCount.textContent = state.files.filter((file) => file.status === "pendente").length;
+  els.supplierCount.textContent = new Set(state.files.map((file) => (file.client || "Sem cliente").toLowerCase())).size;
+  els.billCount.textContent = state.files.filter((file) => (file.documentKind || "").toLowerCase() === "boleto").length;
   els.resultCount.textContent = `${files.length} encontrado${files.length === 1 ? "" : "s"}`;
 }
 
@@ -302,6 +316,7 @@ function renderTable(files) {
           </div>
         </div>
       </td>
+      <td>${escapeHtml(file.documentKind || "Documento")}</td>
       <td>${escapeHtml(file.client || "Sem cliente")}</td>
       <td>${escapeHtml(file.period || "Sem periodo")}</td>
       <td>${escapeHtml(file.category || "Outros")}</td>
@@ -346,6 +361,7 @@ function renderDetail() {
   els.clientInput.value = file.client || "";
   els.periodInput.value = file.period || "";
   els.statusInput.value = file.status || "pendente";
+  els.documentKindInput.value = file.documentKind || "Documento";
   els.categoryInput.value = file.category || "Outros";
   els.tagsInput.value = file.tags || "";
   els.cnpjInput.value = file.cnpj || "";
@@ -395,9 +411,10 @@ function toCsvValue(value) {
 }
 
 function exportCsv() {
-  const headers = ["Arquivo", "Tipo", "Tamanho", "Cliente", "Periodo", "Categoria", "Status", "Tags", "CNPJ", "Chave", "Origem", "Destino sugerido", "Observacoes"];
+  const headers = ["Arquivo", "Documento", "Tipo", "Tamanho", "Cliente", "Periodo", "Categoria", "Status", "Tags", "CNPJ", "Chave", "Origem", "Destino sugerido", "Observacoes"];
   const rows = state.files.map((file) => [
     file.name,
+    file.documentKind || "",
     file.type.toUpperCase(),
     formatBytes(file.size),
     file.client,
@@ -413,6 +430,41 @@ function exportCsv() {
   ]);
   const csv = [headers, ...rows].map((row) => row.map(toCsvValue).join(";")).join("\n");
   downloadText("catalogo-arquivo-claro.csv", csv, "text/csv;charset=utf-8");
+}
+
+async function exportVobiPackage() {
+  const candidates = filteredFiles().filter((file) => file.fileUrl || /^[A-Z]:\\/i.test(file.originalPath || ""));
+  if (!candidates.length) {
+    showToast("Nenhum arquivo do servidor para baixar no pacote Vobi.");
+    return;
+  }
+
+  els.exportVobiBtn.disabled = true;
+  els.exportVobiBtn.textContent = "Preparando...";
+  try {
+    const response = await fetch(`${API_BASE}/api/export/vobi`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ files: candidates }),
+    });
+    if (!response.ok) throw new Error("Falha ao gerar pacote");
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const day = new Date().toISOString().slice(0, 10);
+    link.href = url;
+    link.download = `pacote-vobi-${day}.zip`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    showToast("Pacote Vobi baixado.");
+  } catch {
+    showToast("Não consegui gerar o pacote Vobi.");
+  } finally {
+    els.exportVobiBtn.disabled = false;
+    els.exportVobiBtn.textContent = "Baixar pacote Vobi";
+  }
 }
 
 function exportJson() {
@@ -493,8 +545,8 @@ async function importFromEmail() {
     state.selectedId = incoming[0]?.id || state.selectedId;
     saveState();
     render();
-    els.emailStatus.textContent = `Verificadas ${data.checked} mensagens. Importados ${data.imported} anexos em ${data.outputDir}.`;
-    showToast(`${data.imported} anexo(s) de nota fiscal importado(s).`);
+    els.emailStatus.textContent = `Verificadas ${data.checked} mensagens. Importados ${data.imported} anexos. Duplicados ignorados: ${data.duplicates || 0}. Pasta: ${data.outputDir}.`;
+    showToast(`${data.imported} anexo(s) importado(s). ${data.duplicates || 0} duplicado(s) ignorado(s).`);
   } catch (error) {
     els.emailStatus.textContent = error.message || "Não consegui conectar ao e-mail.";
     showToast("Não consegui importar do e-mail. Confira IMAP e senha de app.");
@@ -564,6 +616,7 @@ function bindEvents() {
   els.clientInput.addEventListener("input", (event) => updateSelected({ client: event.target.value }));
   els.periodInput.addEventListener("input", (event) => updateSelected({ period: event.target.value }));
   els.statusInput.addEventListener("change", (event) => updateSelected({ status: event.target.value }));
+  els.documentKindInput.addEventListener("change", (event) => updateSelected({ documentKind: event.target.value }));
   els.categoryInput.addEventListener("change", (event) => updateSelected({ category: event.target.value }));
   els.tagsInput.addEventListener("input", (event) => updateSelected({ tags: event.target.value }));
   els.cnpjInput.addEventListener("input", (event) => updateSelected({ cnpj: event.target.value }));
@@ -595,6 +648,7 @@ function bindEvents() {
   });
 
   els.exportCsvBtn.addEventListener("click", exportCsv);
+  els.exportVobiBtn.addEventListener("click", exportVobiPackage);
   els.exportJsonBtn.addEventListener("click", exportJson);
   els.copyPlanBtn.addEventListener("click", copyPlan);
   els.importJsonInput.addEventListener("change", (event) => {

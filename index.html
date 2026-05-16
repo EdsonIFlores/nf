@@ -103,11 +103,20 @@
             <span>Pendentes</span>
             <strong id="pendingCount">0</strong>
           </article>
+          <article>
+            <span>Fornecedores</span>
+            <strong id="supplierCount">0</strong>
+          </article>
+          <article>
+            <span>Boletos</span>
+            <strong id="billCount">0</strong>
+          </article>
         </section>
 
         <section class="panel compact">
           <h2>Exportar</h2>
           <button id="exportCsvBtn" class="line-btn" type="button">Baixar planilha CSV</button>
+          <button id="exportVobiBtn" class="primary-btn" type="button">Baixar pacote Vobi</button>
           <button id="exportJsonBtn" class="line-btn" type="button">Baixar backup JSON</button>
           <button id="copyPlanBtn" class="line-btn" type="button">Copiar plano de pastas</button>
           <label class="import-backup">
@@ -173,6 +182,7 @@
                 <thead>
                   <tr>
                     <th>Arquivo</th>
+                    <th>Documento</th>
                     <th>Cliente</th>
                     <th>Período</th>
                     <th>Categoria</th>
@@ -223,6 +233,15 @@
                   </select>
                 </label>
               </div>
+
+              <label>
+                <span>Documento</span>
+                <select id="documentKindInput">
+                  <option>Nota fiscal</option>
+                  <option>Boleto</option>
+                  <option>Documento</option>
+                </select>
+              </label>
 
               <label>
                 <span>Categoria</span>

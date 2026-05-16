@@ -368,7 +368,7 @@ textarea:focus {
 
 table {
   width: 100%;
-  min-width: 860px;
+  min-width: 980px;
   border-collapse: collapse;
   background: #fff;
 }
@@ -566,6 +566,11 @@ tbody tr.selected {
 
 .danger-btn:hover {
   background: #fff1f0;
+}
+
+button:disabled {
+  cursor: wait;
+  opacity: 0.66;
 }
 
 .toast {

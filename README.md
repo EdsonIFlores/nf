@@ -24,7 +24,26 @@ As notas baixadas ficam em `NotasFiscais/Nome do fornecedor/AAAA-MM`.
 - Salva o catálogo no próprio navegador.
 - Exporta CSV, backup JSON e plano de pastas.
 - Conecta por IMAP para buscar anexos PDF/XML de notas fiscais no e-mail.
-- Cria pastas por fornecedor e por data, salvando os anexos no computador.
+- Cria pastas por fornecedor, mes e tipo de documento, salvando os anexos no computador ou servidor.
+- Separa notas fiscais, boletos e outros documentos.
+- Ignora anexos duplicados pelo conteudo do arquivo.
+- Gera um pacote ZIP para envio ao Vobi, com manifesto JSON e arquivos organizados.
+
+## Organizacao das pastas
+
+Os anexos importados por e-mail sao gravados em:
+
+`NotasFiscais/Fornecedor/AAAA-MM/Notas Fiscais`
+
+ou:
+
+`NotasFiscais/Fornecedor/AAAA-MM/Boletos`
+
+O nome do arquivo recebe a data do e-mail no inicio para facilitar a conferencia.
+
+## Pacote Vobi
+
+Use o botao "Baixar pacote Vobi" para gerar um ZIP com os arquivos filtrados na tela. O ZIP mantem as pastas por fornecedor e periodo, e inclui `manifesto-vobi.json` com cliente, CNPJ, chave da nota e caminho de cada arquivo.
 
 ## E-mails aceitos
 
