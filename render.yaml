@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: arquivo-claro
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: PORT
+        value: 10000
+      - key: OUTPUT_DIR
+        value: /opt/render/project/src/NotasFiscais
