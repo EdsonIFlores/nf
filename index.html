@@ -82,8 +82,12 @@
             <span>Mensagens para verificar</span>
             <input id="emailLimit" type="number" min="1" max="300" value="50" />
           </label>
-          <button id="importEmailBtn" class="primary-btn" type="button">Buscar notas fiscais</button>
+          <div class="drop-actions">
+            <button id="testEmailBtn" class="line-btn" type="button">Testar acesso</button>
+            <button id="importEmailBtn" class="primary-btn" type="button">Buscar PDFs e XMLs</button>
+          </div>
           <p class="helper-text" id="emailStatus">Conectando ao servidor do aplicativo.</p>
+          <div class="email-diagnostics" id="emailDiagnostics" aria-live="polite"></div>
         </section>
 
         <section class="summary-grid" aria-label="Indicadores">
@@ -169,6 +173,14 @@
               <option value="Outros">Outros</option>
             </select>
           </label>
+        </section>
+
+        <section class="panel folder-panel">
+          <div class="panel-heading">
+            <h2>Pastas criadas</h2>
+            <span id="folderCount">0 pastas</span>
+          </div>
+          <div class="folder-tree" id="folderTree"></div>
         </section>
 
         <section class="content-grid">

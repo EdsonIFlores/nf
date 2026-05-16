@@ -45,6 +45,25 @@ O nome do arquivo recebe a data do e-mail no inicio para facilitar a conferencia
 
 Use o botao "Baixar pacote Vobi" para gerar um ZIP com os arquivos filtrados na tela. O ZIP mantem as pastas por fornecedor e periodo, e inclui `manifesto-vobi.json` com cliente, CNPJ, chave da nota e caminho de cada arquivo.
 
+## Conferencia do e-mail
+
+Antes de buscar anexos, use "Testar acesso". O app confirma se conseguiu entrar no e-mail, mostra a caixa usada, quantas mensagens existem e quantas estao nao lidas.
+
+Ao clicar em "Buscar PDFs e XMLs", a tela mostra:
+
+- modo da busca;
+- mensagens encontradas;
+- mensagens verificadas;
+- anexos analisados;
+- PDFs/XMLs encontrados;
+- arquivos importados;
+- duplicados ignorados;
+- anexos de outros tipos ignorados.
+
+## Baixar pastas
+
+A area "Pastas criadas" mostra as pastas montadas pelo sistema. Use "Baixar pasta" para salvar no computador um ZIP daquela pasta especifica, ou "Baixar pacote Vobi" para baixar todos os arquivos filtrados.
+
 ## E-mails aceitos
 
 O aplicativo usa IMAP, que é o modo mais comum para aceitar Gmail, Outlook/Hotmail, Yahoo, UOL, BOL, Terra, Locaweb, KingHost e e-mails de domínio próprio. Se o provedor não estiver na lista, escolha "Manual" e informe o servidor IMAP.

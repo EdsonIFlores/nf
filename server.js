@@ -12,6 +12,8 @@ const HOST = process.env.HOST || "0.0.0.0";
 const ROOT = __dirname;
 const OUTPUT_DIR = path.resolve(process.env.OUTPUT_DIR || path.join(ROOT, "NotasFiscais"));
 const INDEX_FILE = path.join(OUTPUT_DIR, ".arquivo-claro-index.json");
+const APP_USER = process.env.APP_USER || "";
+const APP_PASSWORD = process.env.APP_PASSWORD || "";
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -123,6 +125,36 @@ function providerFromEmail(email) {
   if (domain.includes("terra")) return PROVIDERS.terra;
   if (domain.includes("zoho")) return PROVIDERS.zoho;
   return null;
+}
+
+function timingSafeEqualText(a, b) {
+  const left = Buffer.from(String(a || ""));
+  const right = Buffer.from(String(b || ""));
+  return left.length === right.length && crypto.timingSafeEqual(left, right);
+}
+
+function isAuthorized(req) {
+  if (!APP_USER || !APP_PASSWORD) return true;
+  const header = req.headers.authorization || "";
+  if (!header.startsWith("Basic ")) return false;
+  try {
+    const decoded = Buffer.from(header.slice(6), "base64").toString("utf8");
+    const separator = decoded.indexOf(":");
+    if (separator < 0) return false;
+    const user = decoded.slice(0, separator);
+    const password = decoded.slice(separator + 1);
+    return timingSafeEqualText(user, APP_USER) && timingSafeEqualText(password, APP_PASSWORD);
+  } catch {
+    return false;
+  }
+}
+
+function requireAuth(res) {
+  res.writeHead(401, {
+    "WWW-Authenticate": 'Basic realm="Arquivo Claro"',
+    "Content-Type": "text/plain; charset=utf-8",
+  });
+  res.end("Acesso protegido.");
 }
 
 function crc32(buffer) {
@@ -338,20 +370,15 @@ async function importFromEmail(input) {
     throw new Error("Informe e-mail, senha e servidor IMAP.");
   }
 
-  const client = new ImapFlow({
-    host: config.host,
-    port: config.port,
-    secure: config.secure,
-    auth: {
-      user: config.email,
-      pass: config.password,
-    },
-    logger: false,
-  });
+  const client = createImapClient(config);
 
   const records = [];
   let duplicates = 0;
   let checked = 0;
+  let available = 0;
+  let scannedAttachments = 0;
+  let acceptedAttachments = 0;
+  let ignoredAttachments = 0;
 
   await client.connect();
   try {
@@ -359,6 +386,7 @@ async function importFromEmail(input) {
     try {
       const search = config.unreadOnly ? { unseen: true } : {};
       const uids = await client.search(search);
+      available = uids.length;
       const latest = uids.slice(-config.limit);
       if (latest.length) {
         for await (const message of client.fetch(latest, { source: true, envelope: true, flags: true, uid: true })) {
@@ -368,6 +396,12 @@ async function importFromEmail(input) {
           checked += 1;
           const mail = await simpleParser(message.source);
           for (const attachment of mail.attachments || []) {
+            scannedAttachments += 1;
+            if (!isSupportedAttachment(attachment)) {
+              ignoredAttachments += 1;
+              continue;
+            }
+            acceptedAttachments += 1;
             const record = await saveAttachment(attachment, mail, config);
             if (record?.duplicate) duplicates += 1;
             else if (record) records.push(record);
@@ -387,11 +421,34 @@ async function importFromEmail(input) {
   return {
     ok: true,
     outputDir: OUTPUT_DIR,
+    mode: config.unreadOnly ? "Somente nao lidos" : "Todos os e-mails recentes",
+    available,
     checked,
+    scannedAttachments,
+    acceptedAttachments,
+    ignoredAttachments,
     imported: records.length,
     duplicates,
     files: records,
   };
+}
+
+function createImapClient(config) {
+  return new ImapFlow({
+    host: config.host,
+    port: config.port,
+    secure: config.secure,
+    auth: {
+      user: config.email,
+      pass: config.password,
+    },
+    logger: false,
+  });
+}
+
+function isSupportedAttachment(attachment) {
+  const ext = path.extname(attachment.filename || "").toLowerCase();
+  return [".pdf", ".xml"].includes(ext);
 }
 
 async function exportVobiPackage(input) {
@@ -434,6 +491,36 @@ async function exportVobiPackage(input) {
   return makeZip(entries);
 }
 
+async function testEmailAccess(input) {
+  const config = resolveConfig(input);
+  if (!config.host || !config.email || !config.password) {
+    throw new Error("Informe e-mail, senha e servidor IMAP.");
+  }
+
+  const client = createImapClient(config);
+  await client.connect();
+  try {
+    const lock = await client.getMailboxLock(config.mailbox);
+    try {
+      const all = await client.search({});
+      const unread = await client.search({ unseen: true });
+      return {
+        ok: true,
+        email: config.email,
+        host: config.host,
+        mailbox: config.mailbox,
+        totalMessages: all.length,
+        unreadMessages: unread.length,
+        mode: config.unreadOnly ? "Pronto para buscar apenas nao lidos" : "Pronto para buscar e-mails recentes",
+      };
+    } finally {
+      lock.release();
+    }
+  } finally {
+    await client.logout().catch(() => {});
+  }
+}
+
 async function serveStatic(req, res, url) {
   const pathname = url.pathname === "/" ? "/index.html" : decodeURIComponent(url.pathname);
   const filePath = path.resolve(ROOT, `.${pathname}`);
@@ -449,6 +536,7 @@ async function serveStatic(req, res, url) {
 
 async function handle(req, res) {
   if (req.method === "OPTIONS") return send(res, 204, "");
+  if (!isAuthorized(req)) return requireAuth(res);
   const url = new URL(req.url, `http://localhost:${PORT}`);
 
   try {
@@ -459,6 +547,12 @@ async function handle(req, res) {
     if (url.pathname === "/api/email/import" && req.method === "POST") {
       const body = await parseBody(req);
       const result = await importFromEmail(body);
+      return send(res, 200, result);
+    }
+
+    if (url.pathname === "/api/email/test" && req.method === "POST") {
+      const body = await parseBody(req);
+      const result = await testEmailAccess(body);
       return send(res, 200, result);
     }
 

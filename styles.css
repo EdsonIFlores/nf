@@ -203,6 +203,29 @@ label span,
   line-height: 1.35;
 }
 
+.email-diagnostics {
+  display: grid;
+  gap: 6px;
+}
+
+.diagnostic-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 34px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafc;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.diagnostic-row strong {
+  color: var(--ink);
+}
+
 .manual-imap {
   display: none;
   gap: 10px;
@@ -341,6 +364,40 @@ textarea:focus {
   grid-template-columns: minmax(0, 1fr) minmax(300px, 380px);
   gap: 16px;
   align-items: start;
+}
+
+.folder-panel {
+  box-shadow: none;
+}
+
+.folder-tree {
+  display: grid;
+  gap: 8px;
+}
+
+.folder-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.folder-row strong,
+.folder-row span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folder-row span {
+  color: var(--muted);
+  font-size: 0.84rem;
 }
 
 .table-panel,
@@ -647,5 +704,9 @@ button:disabled {
   .table-panel,
   .detail-panel {
     min-height: auto;
+  }
+
+  .folder-row {
+    grid-template-columns: 1fr;
   }
 }

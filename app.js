@@ -67,8 +67,12 @@ const els = {
   unreadOnly: document.querySelector("#unreadOnly"),
   markSeen: document.querySelector("#markSeen"),
   emailLimit: document.querySelector("#emailLimit"),
+  testEmailBtn: document.querySelector("#testEmailBtn"),
   importEmailBtn: document.querySelector("#importEmailBtn"),
   emailStatus: document.querySelector("#emailStatus"),
+  emailDiagnostics: document.querySelector("#emailDiagnostics"),
+  folderTree: document.querySelector("#folderTree"),
+  folderCount: document.querySelector("#folderCount"),
   toast: document.querySelector("#toast"),
 };
 
@@ -127,6 +131,18 @@ function showToast(message) {
   els.toast.classList.add("show");
   window.clearTimeout(showToast.timer);
   showToast.timer = window.setTimeout(() => els.toast.classList.remove("show"), 2600);
+}
+
+function renderDiagnostics(items) {
+  els.emailDiagnostics.innerHTML = "";
+  const fragment = document.createDocumentFragment();
+  items.forEach(([label, value]) => {
+    const row = document.createElement("div");
+    row.className = "diagnostic-row";
+    row.innerHTML = `<span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong>`;
+    fragment.appendChild(row);
+  });
+  els.emailDiagnostics.appendChild(fragment);
 }
 
 function formatBytes(bytes = 0) {
@@ -259,6 +275,13 @@ function suggestedPath(file) {
   return `${client}/${period}/${documentKind}/${file.name}`;
 }
 
+function folderKey(file) {
+  const client = cleanFolderName(file.client, "Sem cliente");
+  const period = cleanFolderName(file.period, "Sem periodo");
+  const documentKind = cleanFolderName(file.documentKind || file.category, "Documento");
+  return `${client}/${period}/${documentKind}`;
+}
+
 function filteredFiles() {
   const query = state.filters.search.toLowerCase().trim();
   return state.files.filter((file) => {
@@ -295,6 +318,37 @@ function renderSummary(files) {
   els.supplierCount.textContent = new Set(state.files.map((file) => (file.client || "Sem cliente").toLowerCase())).size;
   els.billCount.textContent = state.files.filter((file) => (file.documentKind || "").toLowerCase() === "boleto").length;
   els.resultCount.textContent = `${files.length} encontrado${files.length === 1 ? "" : "s"}`;
+}
+
+function renderFolderTree(files) {
+  const groups = new Map();
+  files.forEach((file) => {
+    const key = folderKey(file);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(file);
+  });
+
+  els.folderCount.textContent = `${groups.size} pasta${groups.size === 1 ? "" : "s"}`;
+  els.folderTree.innerHTML = "";
+  if (!groups.size) {
+    els.folderTree.innerHTML = `<div class="folder-row"><div><strong>Nenhuma pasta criada</strong><span>Importe PDFs e XMLs do e-mail para montar a estrutura.</span></div></div>`;
+    return;
+  }
+
+  const fragment = document.createDocumentFragment();
+  [...groups.entries()].sort(([a], [b]) => a.localeCompare(b)).forEach(([key, group]) => {
+    const row = document.createElement("div");
+    row.className = "folder-row";
+    row.innerHTML = `
+      <div>
+        <strong>${escapeHtml(key)}</strong>
+        <span>${group.length} arquivo${group.length === 1 ? "" : "s"} - ${group.map((file) => file.type.toUpperCase()).join(", ")}</span>
+      </div>
+      <button class="line-btn" type="button" data-folder="${escapeHtml(key)}">Baixar pasta</button>
+    `;
+    fragment.appendChild(row);
+  });
+  els.folderTree.appendChild(fragment);
 }
 
 function renderTable(files) {
@@ -382,6 +436,7 @@ function renderDetail() {
 function render() {
   const files = filteredFiles();
   renderSummary(files);
+  renderFolderTree(files);
   renderTable(files);
   renderDetail();
 }
@@ -432,32 +487,36 @@ function exportCsv() {
   downloadText("catalogo-arquivo-claro.csv", csv, "text/csv;charset=utf-8");
 }
 
-async function exportVobiPackage() {
-  const candidates = filteredFiles().filter((file) => file.fileUrl || /^[A-Z]:\\/i.test(file.originalPath || ""));
+async function downloadZip(files, filename) {
+  const candidates = files.filter((file) => file.fileUrl || /^[A-Z]:\\/i.test(file.originalPath || ""));
   if (!candidates.length) {
-    showToast("Nenhum arquivo do servidor para baixar no pacote Vobi.");
+    showToast("Nenhum arquivo do servidor para baixar.");
     return;
   }
 
+  const response = await fetch(`${API_BASE}/api/export/vobi`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ files: candidates }),
+  });
+  if (!response.ok) throw new Error("Falha ao gerar pacote");
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function exportVobiPackage() {
   els.exportVobiBtn.disabled = true;
   els.exportVobiBtn.textContent = "Preparando...";
   try {
-    const response = await fetch(`${API_BASE}/api/export/vobi`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ files: candidates }),
-    });
-    if (!response.ok) throw new Error("Falha ao gerar pacote");
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
     const day = new Date().toISOString().slice(0, 10);
-    link.href = url;
-    link.download = `pacote-vobi-${day}.zip`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
+    await downloadZip(filteredFiles(), `pacote-vobi-${day}.zip`);
     showToast("Pacote Vobi baixado.");
   } catch {
     showToast("Não consegui gerar o pacote Vobi.");
@@ -503,6 +562,53 @@ async function checkServerStatus() {
   }
 }
 
+async function testEmailAccess() {
+  const payload = emailPayload();
+  if (!payload.email || !payload.password || (els.emailProvider.value === "manual" && !payload.host)) {
+    showToast("Preencha e-mail, senha e servidor quando for manual.");
+    return;
+  }
+
+  saveEmailConfig();
+  els.testEmailBtn.disabled = true;
+  els.testEmailBtn.textContent = "Testando...";
+  els.emailStatus.textContent = "Conectando ao e-mail para confirmar o acesso.";
+  renderDiagnostics([
+    ["Acesso ao e-mail", "testando"],
+    ["Busca de anexos", "aguardando"],
+  ]);
+
+  try {
+    const response = await fetch(`${API_BASE}/api/email/test`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || "Falha no teste de e-mail");
+    els.emailStatus.textContent = `Acesso confirmado em ${data.host}.`;
+    renderDiagnostics([
+      ["Acesso ao e-mail", "confirmado"],
+      ["Caixa", data.mailbox],
+      ["Mensagens totais", data.totalMessages],
+      ["Não lidas", data.unreadMessages],
+      ["Modo selecionado", data.mode],
+    ]);
+    showToast("Acesso ao e-mail confirmado.");
+  } catch (error) {
+    els.emailStatus.textContent = error.message || "Não consegui acessar o e-mail.";
+    renderDiagnostics([
+      ["Acesso ao e-mail", "falhou"],
+      ["Correção", "confira IMAP e senha de app"],
+    ]);
+    showToast("Não consegui confirmar o acesso ao e-mail.");
+  } finally {
+    els.testEmailBtn.disabled = false;
+    els.testEmailBtn.textContent = "Testar acesso";
+    els.emailPassword.value = "";
+  }
+}
+
 function emailPayload() {
   const provider = els.emailProvider.value;
   return {
@@ -530,6 +636,11 @@ async function importFromEmail() {
   els.importEmailBtn.disabled = true;
   els.importEmailBtn.textContent = "Buscando...";
   els.emailStatus.textContent = "Conectando ao e-mail e procurando anexos PDF/XML.";
+  renderDiagnostics([
+    ["Acesso ao e-mail", "conectando"],
+    ["Filtro", payload.unreadOnly ? "somente não lidos" : "e-mails recentes"],
+    ["Anexos PDF/XML", "procurando"],
+  ]);
 
   try {
     const response = await fetch(`${API_BASE}/api/email/import`, {
@@ -545,10 +656,25 @@ async function importFromEmail() {
     state.selectedId = incoming[0]?.id || state.selectedId;
     saveState();
     render();
-    els.emailStatus.textContent = `Verificadas ${data.checked} mensagens. Importados ${data.imported} anexos. Duplicados ignorados: ${data.duplicates || 0}. Pasta: ${data.outputDir}.`;
+    els.emailStatus.textContent = `Busca concluída. Pasta principal: ${data.outputDir}.`;
+    renderDiagnostics([
+      ["Acesso ao e-mail", "confirmado"],
+      ["Modo", data.mode || "busca"],
+      ["Mensagens encontradas", data.available ?? 0],
+      ["Mensagens verificadas", data.checked ?? 0],
+      ["Anexos analisados", data.scannedAttachments ?? 0],
+      ["PDF/XML encontrados", data.acceptedAttachments ?? 0],
+      ["Importados", data.imported ?? 0],
+      ["Duplicados ignorados", data.duplicates ?? 0],
+      ["Outros anexos ignorados", data.ignoredAttachments ?? 0],
+    ]);
     showToast(`${data.imported} anexo(s) importado(s). ${data.duplicates || 0} duplicado(s) ignorado(s).`);
   } catch (error) {
     els.emailStatus.textContent = error.message || "Não consegui conectar ao e-mail.";
+    renderDiagnostics([
+      ["Acesso ao e-mail", "falhou"],
+      ["Busca de PDFs/XMLs", "não realizada"],
+    ]);
     showToast("Não consegui importar do e-mail. Confira IMAP e senha de app.");
   } finally {
     els.importEmailBtn.disabled = false;
@@ -594,6 +720,25 @@ function bindEvents() {
     if (!row) return;
     state.selectedId = row.dataset.id;
     render();
+  });
+
+  els.folderTree.addEventListener("click", async (event) => {
+    const button = event.target.closest("button[data-folder]");
+    if (!button) return;
+    const key = button.dataset.folder;
+    const files = filteredFiles().filter((file) => folderKey(file) === key);
+    button.disabled = true;
+    button.textContent = "Baixando...";
+    try {
+      const safeName = key.replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, "-");
+      await downloadZip(files, `${safeName}.zip`);
+      showToast("Pasta baixada.");
+    } catch {
+      showToast("Não consegui baixar essa pasta.");
+    } finally {
+      button.disabled = false;
+      button.textContent = "Baixar pasta";
+    }
   });
 
   els.searchInput.addEventListener("input", (event) => {
@@ -649,6 +794,7 @@ function bindEvents() {
 
   els.exportCsvBtn.addEventListener("click", exportCsv);
   els.exportVobiBtn.addEventListener("click", exportVobiPackage);
+  els.testEmailBtn.addEventListener("click", testEmailAccess);
   els.exportJsonBtn.addEventListener("click", exportJson);
   els.copyPlanBtn.addEventListener("click", copyPlan);
   els.importJsonInput.addEventListener("change", (event) => {
