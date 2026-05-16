@@ -601,7 +601,7 @@ async function testEmailAccess() {
       ["Acesso ao e-mail", "falhou"],
       ["Correção", "confira IMAP e senha de app"],
     ]);
-    showToast("Não consegui confirmar o acesso ao e-mail.");
+    showToast(error.message || "Não consegui confirmar o acesso ao e-mail.");
   } finally {
     els.testEmailBtn.disabled = false;
     els.testEmailBtn.textContent = "Testar acesso";
@@ -675,7 +675,7 @@ async function importFromEmail() {
       ["Acesso ao e-mail", "falhou"],
       ["Busca de PDFs/XMLs", "não realizada"],
     ]);
-    showToast("Não consegui importar do e-mail. Confira IMAP e senha de app.");
+    showToast(error.message || "Não consegui importar do e-mail.");
   } finally {
     els.importEmailBtn.disabled = false;
     els.importEmailBtn.textContent = "Buscar notas fiscais";

@@ -36,7 +36,7 @@ const PROVIDERS = {
   locaweb: { host: "email-ssl.com.br", port: 993, secure: true },
   kinghost: { host: "imap.kinghost.net", port: 993, secure: true },
   zoho: { host: "imap.zoho.com", port: 993, secure: true },
-  zohopro: { host: "imappro.zoho.com", port: 993, secure: true },
+  zohopro: { host: "imap.zoho.com", port: 993, secure: true },
 };
 
 function send(res, status, body, type = "application/json; charset=utf-8") {
@@ -433,6 +433,26 @@ async function importFromEmail(input) {
   };
 }
 
+function publicEmailError(error) {
+  const message = String(error?.message || "Erro desconhecido");
+  if (/auth|login|credentials|password|authentication|invalid/i.test(message)) {
+    return "O servidor recusou o login. Confira o e-mail completo, IMAP ativado no Zoho e a senha de aplicativo.";
+  }
+  if (/certificate|self.signed|ssl|tls/i.test(message)) {
+    return "Falha de segurança SSL/TLS ao conectar no IMAP. Confira servidor imap.zoho.com, porta 993 e SSL ativo.";
+  }
+  if (/timeout|timed out|etimedout/i.test(message)) {
+    return "Tempo esgotado ao conectar no IMAP. Confira servidor, porta e se o Zoho permite acesso IMAP.";
+  }
+  if (/ENOTFOUND|getaddrinfo|dns/i.test(message)) {
+    return "Servidor IMAP não encontrado. Para este Zoho use imap.zoho.com na porta 993.";
+  }
+  if (/ECONNREFUSED|ECONNRESET|socket/i.test(message)) {
+    return "Conexão recusada ou interrompida pelo servidor IMAP. Confira porta 993, SSL e liberação de IMAP.";
+  }
+  return message;
+}
+
 function createImapClient(config) {
   return new ImapFlow({
     host: config.host,
@@ -576,7 +596,7 @@ async function handle(req, res) {
 
     return serveStatic(req, res, url);
   } catch (error) {
-    return send(res, 500, { ok: false, error: error.message || "Erro inesperado" });
+    return send(res, 500, { ok: false, error: publicEmailError(error) });
   }
 }
 
