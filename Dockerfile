@@ -1,0 +1,12 @@
+FROM node:20-slim
+
+WORKDIR /app
+COPY package*.json ./
+RUN npm install --omit=dev
+COPY . .
+
+ENV PORT=10000
+ENV HOST=0.0.0.0
+EXPOSE 10000
+
+CMD ["npm", "start"]

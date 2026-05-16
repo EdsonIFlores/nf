@@ -1,0 +1,17 @@
+{
+  "name": "arquivo-claro",
+  "version": "1.0.0",
+  "description": "Organizador local de notas fiscais PDF e XML com coleta por e-mail IMAP.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "imapflow": "^1.0.194",
+    "mailparser": "^3.7.2"
+  }
+}

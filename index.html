@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Arquivo Claro - Organizador de PDF e XML</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="sidebar" aria-label="Resumo">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">AC</div>
+          <div>
+            <h1>Arquivo Claro</h1>
+            <p>PDFs e XMLs no lugar certo.</p>
+          </div>
+        </div>
+
+        <section class="drop-zone" id="dropZone">
+          <input id="fileInput" type="file" accept=".pdf,.xml,application/pdf,text/xml,application/xml" multiple />
+          <input id="folderInput" type="file" accept=".pdf,.xml,application/pdf,text/xml,application/xml" webkitdirectory multiple />
+          <div class="drop-icon" aria-hidden="true">+</div>
+          <h2>Adicionar arquivos</h2>
+          <p>Arraste PDFs e XMLs aqui ou escolha uma pasta inteira.</p>
+          <div class="drop-actions">
+            <button class="primary-btn" id="pickFilesBtn" type="button">Escolher arquivos</button>
+            <button class="ghost-btn" id="pickFolderBtn" type="button">Escolher pasta</button>
+          </div>
+        </section>
+
+        <section class="panel compact email-panel">
+          <h2>Importar do e-mail</h2>
+          <p class="helper-text">Funciona online com IMAP. Para Gmail, Outlook, Yahoo e alguns provedores, use senha de app.</p>
+          <label>
+            <span>Provedor</span>
+            <select id="emailProvider">
+              <option value="auto">Detectar pelo e-mail</option>
+              <option value="gmail">Gmail</option>
+              <option value="outlook">Outlook / Microsoft 365</option>
+              <option value="hotmail">Hotmail / Live</option>
+              <option value="yahoo">Yahoo</option>
+              <option value="uol">UOL</option>
+              <option value="bol">BOL</option>
+              <option value="terra">Terra</option>
+              <option value="locaweb">Locaweb</option>
+              <option value="kinghost">KingHost</option>
+              <option value="zoho">Zoho pessoal</option>
+              <option value="zohopro">Zoho domínio próprio</option>
+              <option value="manual">Manual</option>
+            </select>
+          </label>
+          <label>
+            <span>E-mail</span>
+            <input id="emailAddress" type="email" placeholder="seuemail@empresa.com.br" autocomplete="username" />
+          </label>
+          <label>
+            <span>Senha ou senha de app</span>
+            <input id="emailPassword" type="password" placeholder="Senha do e-mail" autocomplete="current-password" />
+          </label>
+          <div class="manual-imap" id="manualImap">
+            <label>
+              <span>Servidor IMAP</span>
+              <input id="imapHost" type="text" placeholder="imap.seudominio.com.br" />
+            </label>
+            <label>
+              <span>Porta</span>
+              <input id="imapPort" type="number" min="1" value="993" />
+            </label>
+          </div>
+          <div class="email-options">
+            <label class="check-row">
+              <input id="unreadOnly" type="checkbox" checked />
+              <span>Só não lidos</span>
+            </label>
+            <label class="check-row">
+              <input id="markSeen" type="checkbox" />
+              <span>Marcar como lido</span>
+            </label>
+          </div>
+          <label>
+            <span>Mensagens para verificar</span>
+            <input id="emailLimit" type="number" min="1" max="300" value="50" />
+          </label>
+          <button id="importEmailBtn" class="primary-btn" type="button">Buscar notas fiscais</button>
+          <p class="helper-text" id="emailStatus">Conectando ao servidor do aplicativo.</p>
+        </section>
+
+        <section class="summary-grid" aria-label="Indicadores">
+          <article>
+            <span>Total</span>
+            <strong id="totalCount">0</strong>
+          </article>
+          <article>
+            <span>PDF</span>
+            <strong id="pdfCount">0</strong>
+          </article>
+          <article>
+            <span>XML</span>
+            <strong id="xmlCount">0</strong>
+          </article>
+          <article>
+            <span>Pendentes</span>
+            <strong id="pendingCount">0</strong>
+          </article>
+        </section>
+
+        <section class="panel compact">
+          <h2>Exportar</h2>
+          <button id="exportCsvBtn" class="line-btn" type="button">Baixar planilha CSV</button>
+          <button id="exportJsonBtn" class="line-btn" type="button">Baixar backup JSON</button>
+          <button id="copyPlanBtn" class="line-btn" type="button">Copiar plano de pastas</button>
+          <label class="import-backup">
+            Restaurar backup
+            <input id="importJsonInput" type="file" accept=".json,application/json" />
+          </label>
+          <button id="clearBtn" class="danger-btn" type="button">Limpar catálogo</button>
+        </section>
+      </aside>
+
+      <section class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Catálogo local</p>
+            <h2>Organize por cliente, período, tipo e status</h2>
+          </div>
+          <div class="status-pill" id="saveStatus">Salvo no navegador</div>
+        </header>
+
+        <section class="toolbar" aria-label="Filtros">
+          <label class="search-field">
+            <span>Buscar</span>
+            <input id="searchInput" type="search" placeholder="Nome, cliente, CNPJ, chave, tag..." />
+          </label>
+          <label>
+            <span>Tipo</span>
+            <select id="typeFilter">
+              <option value="all">Todos</option>
+              <option value="pdf">PDF</option>
+              <option value="xml">XML</option>
+            </select>
+          </label>
+          <label>
+            <span>Status</span>
+            <select id="statusFilter">
+              <option value="all">Todos</option>
+              <option value="pendente">Pendente</option>
+              <option value="conferido">Conferido</option>
+              <option value="arquivado">Arquivado</option>
+            </select>
+          </label>
+          <label>
+            <span>Categoria</span>
+            <select id="categoryFilter">
+              <option value="all">Todas</option>
+              <option value="Fiscal">Fiscal</option>
+              <option value="Contratos">Contratos</option>
+              <option value="Financeiro">Financeiro</option>
+              <option value="Pessoal">Pessoal</option>
+              <option value="Outros">Outros</option>
+            </select>
+          </label>
+        </section>
+
+        <section class="content-grid">
+          <section class="panel table-panel">
+            <div class="panel-heading">
+              <h2>Arquivos</h2>
+              <span id="resultCount">0 encontrados</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Arquivo</th>
+                    <th>Cliente</th>
+                    <th>Período</th>
+                    <th>Categoria</th>
+                    <th>Status</th>
+                    <th>Destino sugerido</th>
+                  </tr>
+                </thead>
+                <tbody id="fileTableBody"></tbody>
+              </table>
+            </div>
+            <div class="empty-state" id="emptyState">
+              <strong>Nenhum arquivo no catálogo</strong>
+              <p>Adicione PDFs e XMLs para começar a montar sua organização.</p>
+            </div>
+          </section>
+
+          <aside class="panel detail-panel" aria-label="Detalhes do arquivo">
+            <div id="noSelection" class="no-selection">
+              <strong>Selecione um arquivo</strong>
+              <p>Depois edite cliente, período, categoria, tags e observações.</p>
+            </div>
+
+            <form id="detailForm" class="detail-form hidden">
+              <div class="detail-head">
+                <div class="file-badge" id="detailType">PDF</div>
+                <div>
+                  <h2 id="detailName">Arquivo</h2>
+                  <p id="detailMeta">0 KB</p>
+                </div>
+              </div>
+
+              <label>
+                <span>Cliente ou empresa</span>
+                <input id="clientInput" type="text" placeholder="Ex.: Cliente Alfa" />
+              </label>
+
+              <div class="two-cols">
+                <label>
+                  <span>Período</span>
+                  <input id="periodInput" type="month" />
+                </label>
+                <label>
+                  <span>Status</span>
+                  <select id="statusInput">
+                    <option value="pendente">Pendente</option>
+                    <option value="conferido">Conferido</option>
+                    <option value="arquivado">Arquivado</option>
+                  </select>
+                </label>
+              </div>
+
+              <label>
+                <span>Categoria</span>
+                <select id="categoryInput">
+                  <option>Fiscal</option>
+                  <option>Contratos</option>
+                  <option>Financeiro</option>
+                  <option>Pessoal</option>
+                  <option>Outros</option>
+                </select>
+              </label>
+
+              <label>
+                <span>Tags</span>
+                <input id="tagsInput" type="text" placeholder="boleto, nfe, recebido" />
+              </label>
+
+              <div class="two-cols">
+                <label>
+                  <span>CNPJ</span>
+                  <input id="cnpjInput" type="text" placeholder="00.000.000/0000-00" />
+                </label>
+                <label>
+                  <span>Chave</span>
+                  <input id="keyInput" type="text" placeholder="Chave XML/NFe" />
+                </label>
+              </div>
+
+              <label>
+                <span>Observações</span>
+                <textarea id="notesInput" rows="4" placeholder="Detalhes importantes para localizar depois"></textarea>
+              </label>
+
+              <div class="path-preview">
+                <span>Destino sugerido</span>
+                <strong id="pathPreview">Cliente/Periodo/Tipo/Status/arquivo</strong>
+              </div>
+
+              <div class="detail-actions">
+                <a id="openFileLink" class="line-btn hidden" href="#" target="_blank" rel="noreferrer">Abrir arquivo</a>
+                <button id="duplicateBtn" class="line-btn" type="button">Duplicar registro</button>
+                <button id="deleteBtn" class="danger-btn" type="button">Remover</button>
+              </div>
+            </form>
+          </aside>
+        </section>
+      </section>
+    </main>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="app.js"></script>
+  </body>
+</html>
