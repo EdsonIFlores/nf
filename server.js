@@ -435,6 +435,9 @@ async function importFromEmail(input) {
 
 function publicEmailError(error) {
   const message = String(error?.message || "Erro desconhecido");
+  if (/command failed/i.test(message)) {
+    return "O Zoho recusou um comando IMAP. Confira se o acesso IMAP esta ativado para esta conta e tente usar Manual: imap.zoho.com, porta 993, SSL ativo.";
+  }
   if (/auth|login|credentials|password|authentication|invalid/i.test(message)) {
     return "O servidor recusou o login. Confira o e-mail completo, IMAP ativado no Zoho e a senha de aplicativo.";
   }
@@ -520,22 +523,16 @@ async function testEmailAccess(input) {
   const client = createImapClient(config);
   await client.connect();
   try {
-    const lock = await client.getMailboxLock(config.mailbox);
-    try {
-      const all = await client.search({});
-      const unread = await client.search({ unseen: true });
-      return {
-        ok: true,
-        email: config.email,
-        host: config.host,
-        mailbox: config.mailbox,
-        totalMessages: all.length,
-        unreadMessages: unread.length,
-        mode: config.unreadOnly ? "Pronto para buscar apenas nao lidos" : "Pronto para buscar e-mails recentes",
-      };
-    } finally {
-      lock.release();
-    }
+    const status = await client.status(config.mailbox, { messages: true, unseen: true });
+    return {
+      ok: true,
+      email: config.email,
+      host: config.host,
+      mailbox: config.mailbox,
+      totalMessages: status.messages ?? 0,
+      unreadMessages: status.unseen ?? 0,
+      mode: config.unreadOnly ? "Pronto para buscar apenas nao lidos" : "Pronto para buscar e-mails recentes",
+    };
   } finally {
     await client.logout().catch(() => {});
   }
