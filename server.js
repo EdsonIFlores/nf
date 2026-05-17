@@ -382,9 +382,9 @@ async function importFromEmail(input) {
 
   await client.connect();
   try {
-    const lock = await client.getMailboxLock(config.mailbox);
+    const lock = await client.getMailboxLock(config.mailbox, { readOnly: !config.markSeen });
     try {
-      const search = config.unreadOnly ? { unseen: true } : {};
+      const search = config.unreadOnly ? { seen: false } : {};
       const uids = await client.search(search);
       available = uids.length;
       const latest = uids.slice(-config.limit);
@@ -439,7 +439,7 @@ function publicEmailError(error) {
   if (/command failed/i.test(message)) {
     return {
       error: "O servidor IMAP recusou a operacao.",
-      hint: "No Zoho, confirme se IMAP esta ativado para esta conta e se o administrador do dominio permite acesso IMAP. Use Manual: imap.zoho.com, porta 993, SSL ativo.",
+      hint: "Teste novamente. Se for Zoho, confirme IMAP ativo e permissao do administrador. Se for Gmail, use senha de app e deixe o provedor como Gmail.",
       technical,
     };
   }
@@ -532,14 +532,28 @@ async function testEmailAccess(input) {
   const client = createImapClient(config);
   await client.connect();
   try {
-    const status = await client.status(config.mailbox, { messages: true, unseen: true });
+    let totalMessages = 0;
+    let unreadMessages = 0;
+    try {
+      const status = await client.status(config.mailbox, { messages: true, unseen: true });
+      totalMessages = status.messages ?? 0;
+      unreadMessages = status.unseen ?? 0;
+    } catch {
+      const lock = await client.getMailboxLock(config.mailbox, { readOnly: true });
+      try {
+        totalMessages = client.mailbox?.exists ?? 0;
+        unreadMessages = (await client.search({ seen: false })).length;
+      } finally {
+        lock.release();
+      }
+    }
     return {
       ok: true,
       email: config.email,
       host: config.host,
       mailbox: config.mailbox,
-      totalMessages: status.messages ?? 0,
-      unreadMessages: status.unseen ?? 0,
+      totalMessages,
+      unreadMessages,
       mode: config.unreadOnly ? "Pronto para buscar apenas nao lidos" : "Pronto para buscar e-mails recentes",
     };
   } finally {
