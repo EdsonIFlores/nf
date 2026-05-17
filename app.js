@@ -394,16 +394,43 @@ function suggestedPath(file) {
   }
   const client = cleanFolderName(file.client, "Sem cliente");
   const period = cleanFolderName(file.period, "Sem periodo");
-  const category = cleanFolderName(file.category, "Outros");
-  const documentKind = cleanFolderName(file.documentKind || category, "Documento");
-  return `${client}/${period}/${documentKind}/${file.name}`;
+  return `${client}/${period}/${file.name}`;
+}
+
+function supplierGroupName(file) {
+  const cnpjDigits = String(file.cnpj || "").replace(/\D/g, "");
+  if (cnpjDigits.length >= 8) return cnpjDigits;
+
+  const name = String(file.client || "Sem cliente")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\b(ltda|me|mei|eireli|sa|s\/a|comercio|servicos|servicos|industria|empresa)\b/g, "")
+    .replace(/\d+/g, "")
+    .replace(/[^a-z]+/g, " ")
+    .trim();
+
+  return name.split(/\s+/).filter((word) => word.length > 2).slice(0, 3).join(" ") || "sem cliente";
 }
 
 function folderKey(file) {
-  const client = cleanFolderName(file.client, "Sem cliente");
   const period = cleanFolderName(file.period, "Sem periodo");
-  const documentKind = cleanFolderName(file.documentKind || file.category, "Documento");
-  return `${client}/${period}/${documentKind}`;
+  const supplierKey = supplierGroupName(file);
+  return `${supplierKey}||${period}`;
+}
+
+function folderTitle(key, group = []) {
+  const [, period = "Sem periodo"] = key.split("||");
+  const names = group
+    .map((file) => cleanFolderName(file.client, "Sem cliente"))
+    .filter(Boolean)
+    .sort((a, b) => a.length - b.length);
+  return `${names[0] || "Sem cliente"}/${period}`;
+}
+
+function sameFolder(file, key) {
+  const [, period = ""] = key.split("||");
+  return cleanFolderName(file.period, "Sem periodo") === period && folderKey(file) === key;
 }
 
 function filteredFiles() {
@@ -465,11 +492,12 @@ function renderFolderTree(files) {
     [...groups.entries()].sort(([a], [b]) => a.localeCompare(b)).forEach(([key, group]) => {
       const row = document.createElement("div");
       row.className = "folder-row";
+      const title = folderTitle(key, group);
       row.innerHTML = `
         <div class="folder-label">
           <span class="folder-icon" aria-hidden="true"></span>
           <div>
-            <strong>${escapeHtml(key)}</strong>
+            <strong>${escapeHtml(title)}</strong>
             <span>${group.length} arquivo${group.length === 1 ? "" : "s"} - ${group.map((file) => file.type.toUpperCase()).join(", ")}</span>
           </div>
         </div>
@@ -882,10 +910,11 @@ function bindEvents() {
     if (button) {
       const key = button.dataset.folder;
       const files = filteredFiles().filter((file) => folderKey(file) === key);
+      const title = folderTitle(key, files);
       button.disabled = true;
       button.textContent = "Baixando...";
       try {
-        const safeName = key.replace(/[\/:*?"<>|]+/g, "-").replace(/s+/g, "-");
+        const safeName = title.replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, "-");
         await downloadZip(files, safeName + ".zip");
         showToast("Pasta baixada.");
       } catch {

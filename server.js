@@ -354,7 +354,6 @@ async function saveAttachment(attachment, mail, config) {
     OUTPUT_DIR,
     sanitizeFolderName(supplier, "Fornecedor sem nome"),
     sanitizeFolderName(period, "Sem data"),
-    document.folder,
   );
   await fsp.mkdir(folder, { recursive: true });
 
@@ -553,9 +552,8 @@ async function exportVobiPackage(input) {
       const data = await fsp.readFile(requested);
       const supplier = sanitizeFolderName(file.client, "Fornecedor sem nome");
       const period = sanitizeFolderName(file.period, "Sem data");
-      const kind = sanitizeFolderName(file.documentKind || file.category || "Documento", "Documento");
       const name = sanitizeFileName(path.basename(requested));
-      const zipPath = `${supplier}/${period}/${kind}/${name}`;
+      const zipPath = `${supplier}/${period}/${name}`;
       entries.push({ name: zipPath, data, date: new Date(file.importedAt || Date.now()) });
       manifest.push({
         arquivo: name,

@@ -33,13 +33,9 @@ As notas baixadas ficam em `NotasFiscais/Nome do fornecedor/AAAA-MM`.
 
 Os anexos importados por e-mail sao gravados em:
 
-`NotasFiscais/Fornecedor/AAAA-MM/Notas Fiscais`
+`NotasFiscais/Fornecedor/AAAA-MM`
 
-ou:
-
-`NotasFiscais/Fornecedor/AAAA-MM/Boletos`
-
-O nome do arquivo recebe a data do e-mail no inicio para facilitar a conferencia.
+PDFs e XMLs do mesmo fornecedor e periodo ficam juntos na mesma pasta. O nome do arquivo recebe a data do e-mail no inicio para facilitar a conferencia.
 
 ## Pacote Vobi
 
