@@ -73,6 +73,10 @@ const els = {
   emailDiagnostics: document.querySelector("#emailDiagnostics"),
   folderTree: document.querySelector("#folderTree"),
   folderCount: document.querySelector("#folderCount"),
+  openFoldersBtn: document.querySelector("#openFoldersBtn"),
+  closeFoldersBtn: document.querySelector("#closeFoldersBtn"),
+  folderModal: document.querySelector("#folderModal"),
+  folderModalList: document.querySelector("#folderModalList"),
   toast: document.querySelector("#toast"),
 };
 
@@ -143,6 +147,10 @@ function renderDiagnostics(items) {
     fragment.appendChild(row);
   });
   els.emailDiagnostics.appendChild(fragment);
+}
+
+function formatErrorMessage(data, fallback) {
+  return [data?.error || fallback, data?.hint, data?.technical ? `Detalhe tecnico: ${data.technical}` : ""].filter(Boolean).join(" ");
 }
 
 function formatBytes(bytes = 0) {
@@ -329,26 +337,38 @@ function renderFolderTree(files) {
   });
 
   els.folderCount.textContent = `${groups.size} pasta${groups.size === 1 ? "" : "s"}`;
-  els.folderTree.innerHTML = "";
-  if (!groups.size) {
-    els.folderTree.innerHTML = `<div class="folder-row"><div><strong>Nenhuma pasta criada</strong><span>Importe PDFs e XMLs do e-mail para montar a estrutura.</span></div></div>`;
-    return;
-  }
 
-  const fragment = document.createDocumentFragment();
-  [...groups.entries()].sort(([a], [b]) => a.localeCompare(b)).forEach(([key, group]) => {
-    const row = document.createElement("div");
-    row.className = "folder-row";
-    row.innerHTML = `
-      <div>
-        <strong>${escapeHtml(key)}</strong>
-        <span>${group.length} arquivo${group.length === 1 ? "" : "s"} - ${group.map((file) => file.type.toUpperCase()).join(", ")}</span>
-      </div>
-      <button class="line-btn" type="button" data-folder="${escapeHtml(key)}">Baixar pasta</button>
-    `;
-    fragment.appendChild(row);
-  });
-  els.folderTree.appendChild(fragment);
+  const renderTarget = (target, compact = false) => {
+    target.innerHTML = "";
+    if (!groups.size) {
+      target.innerHTML = `<div class="folder-row"><div class="folder-label"><span class="folder-icon" aria-hidden="true"></span><div><strong>Nenhuma pasta criada</strong><span>Importe PDFs e XMLs do e-mail para montar a estrutura.</span></div></div></div>`;
+      return;
+    }
+
+    const fragment = document.createDocumentFragment();
+    [...groups.entries()].sort(([a], [b]) => a.localeCompare(b)).forEach(([key, group]) => {
+      const row = document.createElement("div");
+      row.className = "folder-row";
+      row.innerHTML = `
+        <div class="folder-label">
+          <span class="folder-icon" aria-hidden="true"></span>
+          <div>
+            <strong>${escapeHtml(key)}</strong>
+            <span>${group.length} arquivo${group.length === 1 ? "" : "s"} - ${group.map((file) => file.type.toUpperCase()).join(", ")}</span>
+          </div>
+        </div>
+        <div class="folder-actions">
+          <button class="line-btn" type="button" data-folder="${escapeHtml(key)}">Baixar pasta</button>
+          ${compact ? "" : `<button class="line-btn" type="button" data-archive-folder="${escapeHtml(key)}">Arquivar</button>`}
+        </div>
+      `;
+      fragment.appendChild(row);
+    });
+    target.appendChild(fragment);
+  };
+
+  renderTarget(els.folderTree, true);
+  renderTarget(els.folderModalList, false);
 }
 
 function renderTable(files) {
@@ -585,7 +605,7 @@ async function testEmailAccess() {
       body: JSON.stringify(payload),
     });
     const data = await response.json();
-    if (!response.ok || !data.ok) throw new Error(data.error || "Falha no teste de e-mail");
+    if (!response.ok || !data.ok) throw new Error(formatErrorMessage(data, "Falha no teste de e-mail"));
     els.emailStatus.textContent = `Acesso confirmado em ${data.host}.`;
     renderDiagnostics([
       ["Acesso ao e-mail", "confirmado"],
@@ -649,7 +669,7 @@ async function importFromEmail() {
       body: JSON.stringify(payload),
     });
     const data = await response.json();
-    if (!response.ok || !data.ok) throw new Error(data.error || "Falha ao importar e-mail");
+    if (!response.ok || !data.ok) throw new Error(formatErrorMessage(data, "Falha ao importar e-mail"));
 
     const incoming = data.files || [];
     state.files = [...incoming, ...state.files];
@@ -722,23 +742,43 @@ function bindEvents() {
     render();
   });
 
-  els.folderTree.addEventListener("click", async (event) => {
+  const handleFolderAction = async (event) => {
     const button = event.target.closest("button[data-folder]");
-    if (!button) return;
-    const key = button.dataset.folder;
-    const files = filteredFiles().filter((file) => folderKey(file) === key);
-    button.disabled = true;
-    button.textContent = "Baixando...";
-    try {
-      const safeName = key.replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, "-");
-      await downloadZip(files, `${safeName}.zip`);
-      showToast("Pasta baixada.");
-    } catch {
-      showToast("Não consegui baixar essa pasta.");
-    } finally {
-      button.disabled = false;
-      button.textContent = "Baixar pasta";
+    const archiveButton = event.target.closest("button[data-archive-folder]");
+    if (button) {
+      const key = button.dataset.folder;
+      const files = filteredFiles().filter((file) => folderKey(file) === key);
+      button.disabled = true;
+      button.textContent = "Baixando...";
+      try {
+        const safeName = key.replace(/[\/:*?"<>|]+/g, "-").replace(/s+/g, "-");
+        await downloadZip(files, safeName + ".zip");
+        showToast("Pasta baixada.");
+      } catch {
+        showToast("Nao consegui baixar essa pasta.");
+      } finally {
+        button.disabled = false;
+        button.textContent = "Baixar pasta";
+      }
+      return;
     }
+    if (archiveButton) {
+      const key = archiveButton.dataset.archiveFolder;
+      state.files.forEach((file) => {
+        if (folderKey(file) === key) file.status = "arquivado";
+      });
+      saveState();
+      render();
+      showToast("Pasta marcada como arquivada.");
+    }
+  };
+
+  els.folderTree.addEventListener("click", handleFolderAction);
+  els.folderModalList.addEventListener("click", handleFolderAction);
+  els.openFoldersBtn.addEventListener("click", () => els.folderModal.classList.remove("hidden"));
+  els.closeFoldersBtn.addEventListener("click", () => els.folderModal.classList.add("hidden"));
+  els.folderModal.addEventListener("click", (event) => {
+    if (event.target === els.folderModal) els.folderModal.classList.add("hidden");
   });
 
   els.searchInput.addEventListener("input", (event) => {

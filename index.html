@@ -137,7 +137,13 @@
             <p class="eyebrow">Catálogo local</p>
             <h2>Organize por cliente, período, tipo e status</h2>
           </div>
-          <div class="status-pill" id="saveStatus">Salvo no navegador</div>
+          <div class="topbar-actions">
+            <button class="folder-open-btn" id="openFoldersBtn" type="button" aria-haspopup="dialog">
+              <span class="folder-icon" aria-hidden="true"></span>
+              Pastas
+            </button>
+            <div class="status-pill" id="saveStatus">Salvo no navegador</div>
+          </div>
         </header>
 
         <section class="toolbar" aria-label="Filtros">
@@ -302,6 +308,19 @@
         </section>
       </section>
     </main>
+
+    <div class="modal-backdrop hidden" id="folderModal" role="dialog" aria-modal="true" aria-labelledby="folderModalTitle">
+      <section class="modal-panel">
+        <div class="modal-heading">
+          <div>
+            <p class="eyebrow">Arquivos organizados</p>
+            <h2 id="folderModalTitle">Pastas criadas</h2>
+          </div>
+          <button class="line-btn" id="closeFoldersBtn" type="button">Fechar</button>
+        </div>
+        <div class="folder-tree modal-folder-tree" id="folderModalList"></div>
+      </section>
+    </div>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="app.js"></script>

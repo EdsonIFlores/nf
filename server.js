@@ -435,22 +435,34 @@ async function importFromEmail(input) {
 
 function publicEmailError(error) {
   const message = String(error?.message || "Erro desconhecido");
+  const technical = message.replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+/g, "[email]");
+  if (/command failed/i.test(message)) {
+    return {
+      error: "O servidor IMAP recusou a operacao.",
+      hint: "No Zoho, confirme se IMAP esta ativado para esta conta e se o administrador do dominio permite acesso IMAP. Use Manual: imap.zoho.com, porta 993, SSL ativo.",
+      technical,
+    };
+  }
   if (/auth|login|credentials|password|authentication|invalid/i.test(message)) {
-    return "O servidor recusou o login. Confira o e-mail completo, IMAP ativado no Zoho e a senha de aplicativo.";
+    return {
+      error: "O servidor recusou o login.",
+      hint: "Confira o e-mail completo, IMAP ativado no Zoho e uma senha de aplicativo gerada para esta mesma conta.",
+      technical,
+    };
   }
   if (/certificate|self.signed|ssl|tls/i.test(message)) {
-    return "Falha de segurança SSL/TLS ao conectar no IMAP. Confira servidor imap.zoho.com, porta 993 e SSL ativo.";
+    return { error: "Falha de seguranca SSL/TLS ao conectar no IMAP.", hint: "Confira servidor imap.zoho.com, porta 993 e SSL ativo.", technical };
   }
   if (/timeout|timed out|etimedout/i.test(message)) {
-    return "Tempo esgotado ao conectar no IMAP. Confira servidor, porta e se o Zoho permite acesso IMAP.";
+    return { error: "Tempo esgotado ao conectar no IMAP.", hint: "Confira servidor, porta e se o Zoho permite acesso IMAP externo.", technical };
   }
   if (/ENOTFOUND|getaddrinfo|dns/i.test(message)) {
-    return "Servidor IMAP não encontrado. Para este Zoho use imap.zoho.com na porta 993.";
+    return { error: "Servidor IMAP nao encontrado.", hint: "Para este Zoho use imap.zoho.com na porta 993.", technical };
   }
   if (/ECONNREFUSED|ECONNRESET|socket/i.test(message)) {
-    return "Conexão recusada ou interrompida pelo servidor IMAP. Confira porta 993, SSL e liberação de IMAP.";
+    return { error: "Conexao recusada ou interrompida pelo servidor IMAP.", hint: "Confira porta 993, SSL e liberacao de IMAP no Zoho.", technical };
   }
-  return message;
+  return { error: message, hint: "Confira servidor IMAP, porta, SSL, senha de aplicativo e permissao IMAP da conta.", technical };
 }
 
 function createImapClient(config) {
@@ -596,7 +608,7 @@ async function handle(req, res) {
 
     return serveStatic(req, res, url);
   } catch (error) {
-    return send(res, 500, { ok: false, error: publicEmailError(error) });
+    return send(res, 500, { ok: false, ...publicEmailError(error) });
   }
 }
 
