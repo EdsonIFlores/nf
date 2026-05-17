@@ -49,6 +49,8 @@ Use o botao "Baixar pacote Vobi" para gerar um ZIP com os arquivos filtrados na 
 
 Antes de buscar anexos, use "Testar acesso". O app confirma se conseguiu entrar no e-mail, mostra a caixa usada, quantas mensagens existem e quantas estao nao lidas.
 
+Depois do teste, o app lista as pastas disponiveis no e-mail. Use "Pasta do e-mail" para buscar em INBOX, arquivados ou pastas especificas do provedor.
+
 Ao clicar em "Buscar PDFs e XMLs", a tela mostra:
 
 - modo da busca;

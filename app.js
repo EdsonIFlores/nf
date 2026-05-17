@@ -67,6 +67,7 @@ const els = {
   unreadOnly: document.querySelector("#unreadOnly"),
   markSeen: document.querySelector("#markSeen"),
   emailLimit: document.querySelector("#emailLimit"),
+  mailboxSelect: document.querySelector("#mailboxSelect"),
   testEmailBtn: document.querySelector("#testEmailBtn"),
   importEmailBtn: document.querySelector("#importEmailBtn"),
   emailStatus: document.querySelector("#emailStatus"),
@@ -109,6 +110,10 @@ function loadEmailConfig() {
     if (typeof config.unreadOnly === "boolean") els.unreadOnly.checked = config.unreadOnly;
     if (typeof config.markSeen === "boolean") els.markSeen.checked = config.markSeen;
     if (config.limit) els.emailLimit.value = config.limit;
+    if (config.mailbox) {
+      ensureMailboxOption(config.mailbox);
+      els.mailboxSelect.value = config.mailbox;
+    }
   } catch {
     localStorage.removeItem(EMAIL_CONFIG_KEY);
   }
@@ -126,6 +131,7 @@ function saveEmailConfig() {
       unreadOnly: els.unreadOnly.checked,
       markSeen: els.markSeen.checked,
       limit: els.emailLimit.value,
+      mailbox: els.mailboxSelect.value,
     }),
   );
 }
@@ -151,6 +157,32 @@ function renderDiagnostics(items) {
 
 function formatErrorMessage(data, fallback) {
   return [data?.error || fallback, data?.hint, data?.technical ? `Detalhe tecnico: ${data.technical}` : ""].filter(Boolean).join(" ");
+}
+
+function ensureMailboxOption(path, label = path) {
+  if (!path) return;
+  const exists = [...els.mailboxSelect.options].some((option) => option.value === path);
+  if (exists) return;
+  const option = document.createElement("option");
+  option.value = path;
+  option.textContent = label || path;
+  els.mailboxSelect.appendChild(option);
+}
+
+function renderMailboxes(mailboxes = []) {
+  const current = els.mailboxSelect.value || "INBOX";
+  els.mailboxSelect.innerHTML = "";
+  const list = mailboxes.length ? mailboxes : [{ path: "INBOX", name: "INBOX / Caixa de entrada" }];
+  list.forEach((box) => {
+    const option = document.createElement("option");
+    option.value = box.path;
+    option.textContent = box.path === "INBOX" ? "INBOX / Caixa de entrada" : box.path;
+    els.mailboxSelect.appendChild(option);
+  });
+  if (![...els.mailboxSelect.options].some((option) => option.value === current)) {
+    ensureMailboxOption(current);
+  }
+  els.mailboxSelect.value = current;
 }
 
 function formatBytes(bytes = 0) {
@@ -626,8 +658,11 @@ async function testEmailAccess() {
       ["Caixa", data.mailbox],
       ["Mensagens totais", data.totalMessages],
       ["Não lidas", data.unreadMessages],
+      ["Pastas encontradas", data.mailboxes?.length || 1],
       ["Modo selecionado", data.mode],
     ]);
+    renderMailboxes(data.mailboxes || []);
+    saveEmailConfig();
     showToast("Acesso ao e-mail confirmado.");
   } catch (error) {
     els.emailStatus.textContent = error.message || "Não consegui acessar o e-mail.";
@@ -652,7 +687,7 @@ function emailPayload() {
     host: provider === "manual" ? els.imapHost.value.trim() : "",
     port: provider === "manual" ? Number(els.imapPort.value || 993) : 993,
     secure: true,
-    mailbox: "INBOX",
+    mailbox: els.mailboxSelect.value || "INBOX",
     unreadOnly: els.unreadOnly.checked,
     markSeen: els.markSeen.checked,
     limit: Number(els.emailLimit.value || 50),
@@ -672,6 +707,7 @@ async function importFromEmail() {
   els.emailStatus.textContent = "Conectando ao e-mail e procurando anexos PDF/XML.";
   renderDiagnostics([
     ["Acesso ao e-mail", "conectando"],
+    ["Pasta", payload.mailbox || "INBOX"],
     ["Filtro", payload.unreadOnly ? "somente não lidos" : "e-mails recentes"],
     ["Anexos PDF/XML", "procurando"],
   ]);
@@ -903,6 +939,7 @@ function bindEvents() {
   [els.emailAddress, els.imapHost, els.imapPort, els.emailLimit].forEach((input) => {
     input.addEventListener("input", saveEmailConfig);
   });
+  els.mailboxSelect.addEventListener("change", saveEmailConfig);
   [els.unreadOnly, els.markSeen].forEach((input) => {
     input.addEventListener("change", saveEmailConfig);
   });

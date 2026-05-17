@@ -484,6 +484,35 @@ function isSupportedAttachment(attachment) {
   return [".pdf", ".xml"].includes(ext);
 }
 
+async function listMailboxes(client) {
+  const boxes = [];
+  const entries = await client.list();
+  const walk = (items) => {
+    for (const item of items || []) {
+      if (!item.path) continue;
+      const flags = [...(item.flags || [])].map((flag) => String(flag).toLowerCase());
+      const selectable = !flags.some((flag) => flag.includes("noselect"));
+      if (selectable) {
+        boxes.push({
+          path: item.path,
+          name: item.name || item.path,
+          specialUse: item.specialUse || "",
+        });
+      }
+      if (item.childNodes?.length) walk(item.childNodes);
+    }
+  };
+  walk(entries);
+  if (!boxes.some((box) => box.path === "INBOX")) {
+    boxes.unshift({ path: "INBOX", name: "INBOX", specialUse: "\\Inbox" });
+  }
+  return boxes.sort((a, b) => {
+    if (a.path === "INBOX") return -1;
+    if (b.path === "INBOX") return 1;
+    return a.path.localeCompare(b.path);
+  });
+}
+
 async function exportVobiPackage(input) {
   const files = Array.isArray(input.files) ? input.files : [];
   const entries = [];
@@ -533,6 +562,7 @@ async function testEmailAccess(input) {
   const client = createImapClient(config);
   await client.connect();
   try {
+    const mailboxes = await listMailboxes(client);
     let totalMessages = 0;
     let unreadMessages = 0;
     try {
@@ -555,6 +585,7 @@ async function testEmailAccess(input) {
       mailbox: config.mailbox,
       totalMessages,
       unreadMessages,
+      mailboxes,
       mode: config.unreadOnly ? "Pronto para buscar apenas nao lidos" : "Pronto para buscar e-mails recentes",
     };
   } finally {
