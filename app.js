@@ -6,6 +6,8 @@ const state = {
   files: [],
   selectedId: null,
   objectUrls: new Map(),
+  serverCatalogReady: false,
+  syncTimer: null,
   filters: {
     search: "",
     type: "all",
@@ -94,10 +96,67 @@ function loadState() {
   }
 }
 
+function cleanCatalogFiles() {
+  return state.files.map(({ objectUrl, ...file }) => file);
+}
+
 function saveState() {
-  const cleanFiles = state.files.map(({ objectUrl, ...file }) => file);
+  const cleanFiles = cleanCatalogFiles();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(cleanFiles));
   els.saveStatus.textContent = "Salvo no navegador";
+  scheduleCatalogSync();
+}
+
+function mergeCatalogFiles(localFiles, serverFiles) {
+  const map = new Map();
+  [...serverFiles, ...localFiles].forEach((file) => {
+    if (!file || !file.name) return;
+    const key = file.id || file.hash || `${file.originalPath || ""}:${file.name}`;
+    if (!map.has(key)) map.set(key, file);
+  });
+  return [...map.values()].sort((a, b) => String(b.importedAt || "").localeCompare(String(a.importedAt || "")));
+}
+
+function scheduleCatalogSync() {
+  if (!state.serverCatalogReady) return;
+  window.clearTimeout(state.syncTimer);
+  state.syncTimer = window.setTimeout(syncCatalogToServer, 700);
+}
+
+async function syncCatalogToServer() {
+  if (!state.serverCatalogReady) return;
+  try {
+    const response = await fetch(`${API_BASE}/api/catalog`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ files: cleanCatalogFiles() }),
+    });
+    if (!response.ok) throw new Error("Falha ao salvar catalogo");
+    els.saveStatus.textContent = "Salvo no servidor";
+  } catch {
+    els.saveStatus.textContent = "Salvo no navegador";
+  }
+}
+
+async function loadServerCatalog() {
+  try {
+    const response = await fetch(`${API_BASE}/api/catalog`);
+    if (!response.ok) throw new Error("Catalogo indisponivel");
+    const data = await response.json();
+    const serverFiles = Array.isArray(data.files) ? data.files : [];
+    state.serverCatalogReady = true;
+    if (serverFiles.length || state.files.length) {
+      state.files = mergeCatalogFiles(state.files, serverFiles);
+      state.selectedId = state.selectedId || state.files[0]?.id || null;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(cleanCatalogFiles()));
+      render();
+      await syncCatalogToServer();
+    } else {
+      els.saveStatus.textContent = "Salvo no servidor";
+    }
+  } catch {
+    state.serverCatalogReady = false;
+  }
 }
 
 function loadEmailConfig() {
@@ -951,3 +1010,4 @@ loadEmailConfig();
 bindEvents();
 render();
 checkServerStatus();
+loadServerCatalog();

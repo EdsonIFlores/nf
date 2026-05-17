@@ -21,7 +21,7 @@ As notas baixadas ficam em `NotasFiscais/Nome do fornecedor/AAAA-MM`.
 - Lê dados básicos de XML/NFe quando disponíveis, como empresa, CNPJ, período e chave.
 - Permite editar cliente, período, categoria, status, tags e observações.
 - Sugere um caminho de organização por cliente, período, categoria, tipo e status.
-- Salva o catálogo no próprio navegador.
+- Salva o catálogo no próprio navegador e sincroniza com o servidor local quando disponível.
 - Exporta CSV, backup JSON e plano de pastas.
 - Conecta por IMAP para buscar anexos PDF/XML de notas fiscais no e-mail.
 - Cria pastas por fornecedor, mes e tipo de documento, salvando os anexos no computador ou servidor.
@@ -65,6 +65,14 @@ Ao clicar em "Buscar PDFs e XMLs", a tela mostra:
 ## Baixar pastas
 
 A area "Pastas criadas" mostra as pastas montadas pelo sistema. Use "Baixar pasta" para salvar no computador um ZIP daquela pasta especifica, ou "Baixar pacote Vobi" para baixar todos os arquivos filtrados.
+
+## Persistencia do catalogo
+
+O app ainda mantem uma copia no navegador, mas quando aberto pelo servidor tambem salva o catalogo em:
+
+`NotasFiscais/catalogo-arquivo-claro.json`
+
+Essa e a primeira camada para migrar depois para SQLite sem perder compatibilidade com a versao atual.
 
 ## E-mails aceitos
 

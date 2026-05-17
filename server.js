@@ -12,6 +12,7 @@ const HOST = process.env.HOST || "0.0.0.0";
 const ROOT = __dirname;
 const OUTPUT_DIR = path.resolve(process.env.OUTPUT_DIR || path.join(ROOT, "NotasFiscais"));
 const INDEX_FILE = path.join(OUTPUT_DIR, ".arquivo-claro-index.json");
+const CATALOG_FILE = path.join(OUTPUT_DIR, "catalogo-arquivo-claro.json");
 const APP_USER = process.env.APP_USER || "";
 const APP_PASSWORD = process.env.APP_PASSWORD || "";
 
@@ -250,6 +251,33 @@ async function readIndex() {
 async function writeIndex(index) {
   await fsp.mkdir(OUTPUT_DIR, { recursive: true });
   await fsp.writeFile(INDEX_FILE, JSON.stringify(index, null, 2));
+}
+
+async function readCatalog() {
+  try {
+    const data = JSON.parse(await fsp.readFile(CATALOG_FILE, "utf8"));
+    return {
+      version: 1,
+      updatedAt: data.updatedAt || null,
+      files: Array.isArray(data.files) ? data.files : [],
+    };
+  } catch {
+    return { version: 1, updatedAt: null, files: [] };
+  }
+}
+
+async function writeCatalog(files) {
+  const cleanFiles = Array.isArray(files)
+    ? files.map(({ objectUrl, ...file }) => file).filter((file) => file && file.id && file.name)
+    : [];
+  const catalog = {
+    version: 1,
+    updatedAt: new Date().toISOString(),
+    files: cleanFiles,
+  };
+  await fsp.mkdir(OUTPUT_DIR, { recursive: true });
+  await fsp.writeFile(CATALOG_FILE, JSON.stringify(catalog, null, 2));
+  return catalog;
 }
 
 function detectDocumentKind({ fileName, subject, type, xmlMetadata }) {
@@ -613,7 +641,18 @@ async function handle(req, res) {
 
   try {
     if (url.pathname === "/api/status") {
-      return send(res, 200, { ok: true, outputDir: OUTPUT_DIR });
+      return send(res, 200, { ok: true, outputDir: OUTPUT_DIR, catalogFile: CATALOG_FILE });
+    }
+
+    if (url.pathname === "/api/catalog" && req.method === "GET") {
+      const catalog = await readCatalog();
+      return send(res, 200, { ok: true, ...catalog });
+    }
+
+    if (url.pathname === "/api/catalog" && req.method === "POST") {
+      const body = await parseBody(req);
+      const catalog = await writeCatalog(body.files || []);
+      return send(res, 200, { ok: true, ...catalog });
     }
 
     if (url.pathname === "/api/email/import" && req.method === "POST") {
