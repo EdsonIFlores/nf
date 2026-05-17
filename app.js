@@ -422,6 +422,15 @@ function selectedFile() {
   return state.files.find((file) => file.id === state.selectedId);
 }
 
+function serverFileUrl(file) {
+  if (!file?.fileUrl) return "";
+  try {
+    return new URL(file.fileUrl, API_BASE || location.origin).toString();
+  } catch {
+    return `${API_BASE}${file.fileUrl}`;
+  }
+}
+
 function renderDetail() {
   const file = selectedFile();
   els.noSelection.classList.toggle("hidden", Boolean(file));
@@ -444,12 +453,17 @@ function renderDetail() {
   els.pathPreview.textContent = suggestedPath(file);
 
   const objectUrl = state.objectUrls.get(file.id);
-  els.openFileLink.classList.toggle("hidden", !objectUrl);
+  const fileUrl = serverFileUrl(file);
+  els.openFileLink.classList.toggle("hidden", !objectUrl && !fileUrl);
   if (objectUrl) {
     els.openFileLink.href = objectUrl;
-  } else if (file.fileUrl) {
-    els.openFileLink.classList.remove("hidden");
-    els.openFileLink.href = `${API_BASE}${file.fileUrl}`;
+    els.openFileLink.dataset.openMode = "browser";
+  } else if (fileUrl) {
+    els.openFileLink.href = fileUrl;
+    els.openFileLink.dataset.openMode = "server";
+  } else {
+    els.openFileLink.removeAttribute("href");
+    els.openFileLink.dataset.openMode = "";
   }
 }
 
@@ -830,6 +844,33 @@ function bindEvents() {
     saveState();
     render();
     showToast("Arquivo removido do catálogo.");
+  });
+
+  els.openFileLink.addEventListener("click", async (event) => {
+    const file = selectedFile();
+    if (!file) {
+      event.preventDefault();
+      showToast("Selecione um arquivo antes de abrir.");
+      return;
+    }
+
+    const mode = els.openFileLink.dataset.openMode;
+    if (mode === "browser") return;
+
+    if (mode === "server") {
+      event.preventDefault();
+      try {
+        const response = await fetch(els.openFileLink.href, { method: "HEAD" });
+        if (!response.ok) throw new Error("Arquivo indisponivel");
+        window.open(els.openFileLink.href, "_blank", "noopener,noreferrer");
+      } catch {
+        showToast("Nao encontrei esse arquivo no servidor. Ele pode ter sido removido em um novo deploy.");
+      }
+      return;
+    }
+
+    event.preventDefault();
+    showToast("Arquivo indisponivel. Importe novamente ou baixe pelo pacote/pasta.");
   });
 
   els.exportCsvBtn.addEventListener("click", exportCsv);

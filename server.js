@@ -596,8 +596,21 @@ async function handle(req, res) {
     if (url.pathname === "/api/file") {
       const requested = path.resolve(url.searchParams.get("path") || "");
       if (!requested.startsWith(OUTPUT_DIR)) return send(res, 403, "Acesso negado", "text/plain; charset=utf-8");
+      if (req.method === "HEAD") {
+        await fsp.access(requested, fs.constants.R_OK);
+        res.writeHead(200, {
+          "Content-Type": MIME[path.extname(requested).toLowerCase()] || "application/octet-stream",
+          "Access-Control-Allow-Origin": "*",
+        });
+        return res.end();
+      }
       const data = await fsp.readFile(requested);
-      return send(res, 200, data, MIME[path.extname(requested).toLowerCase()] || "application/octet-stream");
+      res.writeHead(200, {
+        "Content-Type": MIME[path.extname(requested).toLowerCase()] || "application/octet-stream",
+        "Content-Disposition": `inline; filename="${path.basename(requested).replace(/"/g, "")}"`,
+        "Access-Control-Allow-Origin": "*",
+      });
+      return res.end(data);
     }
 
     return serveStatic(req, res, url);
