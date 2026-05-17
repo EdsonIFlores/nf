@@ -36,7 +36,7 @@ const PROVIDERS = {
   locaweb: { host: "email-ssl.com.br", port: 993, secure: true },
   kinghost: { host: "imap.kinghost.net", port: 993, secure: true },
   zoho: { host: "imap.zoho.com", port: 993, secure: true },
-  zohopro: { host: "imap.zoho.com", port: 993, secure: true },
+  zohopro: { host: "imappro.zoho.com", port: 993, secure: true },
 };
 
 function send(res, status, body, type = "application/json; charset=utf-8") {
@@ -124,6 +124,7 @@ function providerFromEmail(email) {
   if (domain.includes("bol")) return PROVIDERS.bol;
   if (domain.includes("terra")) return PROVIDERS.terra;
   if (domain.includes("zoho")) return PROVIDERS.zoho;
+  if (domain) return PROVIDERS.zohopro;
   return null;
 }
 
@@ -439,7 +440,7 @@ function publicEmailError(error) {
   if (/command failed/i.test(message)) {
     return {
       error: "O servidor IMAP recusou a operacao.",
-      hint: "Teste novamente. Se for Zoho, confirme IMAP ativo e permissao do administrador. Se for Gmail, use senha de app e deixe o provedor como Gmail.",
+      hint: "Teste novamente. Para Zoho com dominio proprio, use o provedor Zoho dominio proprio ou Manual com imappro.zoho.com, porta 993, SSL ativo. Para Gmail, use senha de app e provedor Gmail.",
       technical,
     };
   }
