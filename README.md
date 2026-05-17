@@ -74,6 +74,14 @@ O app ainda mantem uma copia no navegador, mas quando aberto pelo servidor tambe
 
 Essa e a primeira camada para migrar depois para SQLite sem perder compatibilidade com a versao atual.
 
+## Restaurar backup com arquivos locais
+
+O backup JSON restaura os registros do catalogo. Por seguranca do navegador, ele nao consegue restaurar automaticamente o acesso aos arquivos locais do computador.
+
+Depois de restaurar o backup, escolha novamente os mesmos arquivos ou a mesma pasta. O app reconhece pelo nome, tamanho e tipo, e reanexa aos registros existentes sem duplicar.
+
+Arquivos importados do e-mail continuam abrindo pelo servidor quando ainda existem na pasta `NotasFiscais`.
+
 ## E-mails aceitos
 
 O aplicativo usa IMAP, que é o modo mais comum para aceitar Gmail, Outlook/Hotmail, Yahoo, UOL, BOL, Terra, Locaweb, KingHost e e-mails de domínio próprio. Se o provedor não estiver na lista, escolha "Manual" e informe o servidor IMAP.

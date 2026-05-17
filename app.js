@@ -347,6 +347,11 @@ async function buildRecord(file) {
   return record;
 }
 
+function sameLocalFile(record, file, type) {
+  if (!record || record.fileUrl || state.objectUrls.has(record.id)) return false;
+  return record.name === file.name && Number(record.size || 0) === Number(file.size || 0) && record.type === type;
+}
+
 async function addFiles(fileList) {
   const accepted = [...fileList].filter((file) => /\.(pdf|xml)$/i.test(file.name));
   if (!accepted.length) {
@@ -355,12 +360,32 @@ async function addFiles(fileList) {
   }
 
   els.saveStatus.textContent = "Importando...";
-  const records = await Promise.all(accepted.map(buildRecord));
-  state.files = [...records, ...state.files];
-  state.selectedId = records[0]?.id || state.selectedId;
+  const records = [];
+  let reattached = 0;
+
+  for (const file of accepted) {
+    const type = inferType(file);
+    const existing = state.files.find((record) => sameLocalFile(record, file, type));
+    if (existing) {
+      state.objectUrls.set(existing.id, URL.createObjectURL(file));
+      existing.originalPath = file.webkitRelativePath || file.name;
+      existing.notes = existing.notes || "Arquivo local reanexado apos restaurar backup.";
+      reattached += 1;
+    } else {
+      records.push(await buildRecord(file));
+    }
+  }
+
+  if (records.length) {
+    state.files = [...records, ...state.files];
+  }
+  state.selectedId = records[0]?.id || state.selectedId || state.files[0]?.id || null;
   saveState();
   render();
-  showToast(`${records.length} arquivo(s) adicionados.`);
+  const parts = [];
+  if (records.length) parts.push(`${records.length} arquivo(s) adicionados`);
+  if (reattached) parts.push(`${reattached} arquivo(s) reanexados ao backup`);
+  showToast(parts.length ? `${parts.join(". ")}.` : "Nenhum arquivo novo para adicionar.");
 }
 
 function suggestedPath(file) {
@@ -663,7 +688,7 @@ async function importJson(file) {
     state.selectedId = state.files[0]?.id || null;
     saveState();
     render();
-    showToast("Backup restaurado.");
+    showToast("Backup restaurado. Para arquivos locais, escolha novamente os arquivos ou a pasta para reanexar.");
   } catch {
     showToast("Não consegui restaurar esse backup.");
   }
