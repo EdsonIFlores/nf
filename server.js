@@ -479,13 +479,13 @@ function publicEmailError(error) {
     };
   }
   if (/certificate|self.signed|ssl|tls/i.test(message)) {
-    return { error: "Falha de seguranca SSL/TLS ao conectar no IMAP.", hint: "Confira servidor imap.zoho.com, porta 993 e SSL ativo.", technical };
+    return { error: "Falha de seguranca SSL/TLS ao conectar no IMAP.", hint: "Confira servidor imappro.zoho.com para Zoho com dominio proprio, porta 993 e SSL ativo.", technical };
   }
   if (/timeout|timed out|etimedout/i.test(message)) {
     return { error: "Tempo esgotado ao conectar no IMAP.", hint: "Confira servidor, porta e se o Zoho permite acesso IMAP externo.", technical };
   }
   if (/ENOTFOUND|getaddrinfo|dns/i.test(message)) {
-    return { error: "Servidor IMAP nao encontrado.", hint: "Para este Zoho use imap.zoho.com na porta 993.", technical };
+    return { error: "Servidor IMAP nao encontrado.", hint: "Para Zoho com dominio proprio use imappro.zoho.com na porta 993.", technical };
   }
   if (/ECONNREFUSED|ECONNRESET|socket/i.test(message)) {
     return { error: "Conexao recusada ou interrompida pelo servidor IMAP.", hint: "Confira porta 993, SSL e liberacao de IMAP no Zoho.", technical };

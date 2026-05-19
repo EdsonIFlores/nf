@@ -58,6 +58,10 @@
             <span>Senha ou senha de app</span>
             <input id="emailPassword" type="password" placeholder="Senha do e-mail" autocomplete="current-password" />
           </label>
+          <label class="check-row subtle-check">
+            <input id="rememberEmailPassword" type="checkbox" />
+            <span>Lembrar senha de app neste navegador</span>
+          </label>
           <div class="manual-imap" id="manualImap">
             <label>
               <span>Servidor IMAP</span>
@@ -92,8 +96,36 @@
             <button id="testEmailBtn" class="line-btn" type="button">Testar acesso</button>
             <button id="importEmailBtn" class="primary-btn" type="button">Buscar PDFs e XMLs</button>
           </div>
+          <div class="drop-actions">
+            <button id="saveEmailSettingsBtn" class="line-btn" type="button">Salvar configuração</button>
+            <button id="forgetEmailSettingsBtn" class="ghost-btn" type="button">Esquecer senha</button>
+          </div>
           <p class="helper-text" id="emailStatus">Conectando ao servidor do aplicativo.</p>
           <div class="email-diagnostics" id="emailDiagnostics" aria-live="polite"></div>
+        </section>
+
+        <section class="panel compact settings-panel">
+          <div class="section-title">
+            <span class="section-icon" aria-hidden="true">✓</span>
+            <div>
+              <h2>Conferidos e Drive</h2>
+              <p class="helper-text">Escolha uma pasta sincronizada, como Google Drive ou OneDrive, para salvar automaticamente arquivos marcados como conferidos.</p>
+            </div>
+          </div>
+          <div class="setting-card">
+            <span>Pasta de destino</span>
+            <strong id="checkedFolderName">Nenhuma pasta escolhida</strong>
+            <p id="checkedFolderStatus" class="helper-text">Ao marcar um arquivo como Conferido, o app salvará uma cópia em Fornecedor / Ano-mês.</p>
+          </div>
+          <label>
+            <span>Caminho de referência</span>
+            <input id="checkedPathHint" type="text" placeholder="Ex.: G:\Meu Drive\Notas Conferidas" />
+          </label>
+          <div class="drop-actions">
+            <button id="chooseCheckedFolderBtn" class="primary-btn" type="button">Escolher pasta</button>
+            <button id="saveSettingsBtn" class="line-btn" type="button">Salvar destino</button>
+          </div>
+          <p class="helper-text">No modo online, o navegador precisa pedir permissão para gravar na pasta escolhida. Isso evita salvar arquivos no lugar errado.</p>
         </section>
 
         <section class="summary-grid" aria-label="Indicadores">

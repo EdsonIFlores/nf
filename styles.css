@@ -732,6 +732,191 @@ button:disabled {
   opacity: 0.66;
 }
 
+/* Product polish layer */
+body {
+  background:
+    linear-gradient(135deg, rgba(21, 94, 239, 0.10), transparent 34%),
+    linear-gradient(315deg, rgba(14, 147, 132, 0.10), transparent 34%),
+    #eef3f8;
+}
+
+.app-shell {
+  grid-template-columns: minmax(300px, 360px) 1fr;
+  gap: 22px;
+  padding: 22px;
+}
+
+.sidebar {
+  position: sticky;
+  top: 22px;
+  align-self: start;
+  max-height: calc(100vh - 44px);
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.brand {
+  padding: 12px 4px 4px;
+}
+
+.brand-mark {
+  width: 52px;
+  height: 52px;
+  background: linear-gradient(135deg, #155eef, #0e9384);
+  box-shadow: 0 12px 28px rgba(21, 94, 239, 0.28);
+}
+
+.drop-zone,
+.panel,
+.toolbar,
+.topbar {
+  border-color: rgba(217, 226, 239, 0.96);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 10px 28px rgba(16, 24, 40, 0.07);
+}
+
+.topbar {
+  padding: 18px 20px;
+  border-radius: 8px;
+  backdrop-filter: blur(10px);
+}
+
+.topbar h2 {
+  font-size: clamp(1.45rem, 2.6vw, 2.25rem);
+  line-height: 1.12;
+}
+
+.drop-zone {
+  box-shadow: 0 10px 28px rgba(16, 24, 40, 0.06);
+}
+
+.summary-grid article {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(180deg, #fff, #f8fbff);
+  box-shadow: 0 8px 20px rgba(16, 24, 40, 0.05);
+}
+
+.summary-grid article::after {
+  content: "";
+  position: absolute;
+  right: -18px;
+  bottom: -22px;
+  width: 58px;
+  height: 58px;
+  border-radius: 999px;
+  background: rgba(21, 94, 239, 0.08);
+}
+
+.summary-grid strong {
+  line-height: 1;
+}
+
+.email-panel {
+  border-top: 4px solid #155eef;
+}
+
+.settings-panel {
+  border-top: 4px solid #0e9384;
+}
+
+.section-title {
+  display: grid;
+  grid-template-columns: 38px 1fr;
+  gap: 10px;
+  align-items: start;
+}
+
+.section-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  color: #fff;
+  background: linear-gradient(135deg, #0e9384, #155eef);
+  font-weight: 800;
+}
+
+.setting-card {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid #d9e2ef;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #f8fbff, #ffffff);
+}
+
+.setting-card span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.setting-card strong {
+  color: #101828;
+  line-height: 1.25;
+}
+
+.subtle-check {
+  background: #f8fbff;
+}
+
+.subtle-check span {
+  color: #344054;
+  font-size: 0.84rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.toolbar {
+  padding: 16px;
+}
+
+input,
+select,
+textarea {
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+}
+
+.table-wrap,
+.folder-panel {
+  box-shadow: 0 8px 22px rgba(16, 24, 40, 0.05);
+}
+
+.folder-row {
+  background: linear-gradient(180deg, #fff, #fbfdff);
+  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.folder-row:hover {
+  border-color: #b9c9df;
+  box-shadow: 0 8px 20px rgba(16, 24, 40, 0.06);
+  transform: translateY(-1px);
+}
+
+.primary-btn {
+  background: linear-gradient(180deg, #155eef, #1049bd);
+  box-shadow: 0 8px 18px rgba(21, 94, 239, 0.20);
+}
+
+.line-btn,
+.ghost-btn,
+.import-backup {
+  box-shadow: 0 2px 6px rgba(16, 24, 40, 0.04);
+}
+
+.status-pill {
+  border: 1px solid rgba(8, 116, 67, 0.16);
+}
+
+.detail-panel {
+  position: sticky;
+  top: 22px;
+}
+
 .toast {
   position: fixed;
   right: 20px;

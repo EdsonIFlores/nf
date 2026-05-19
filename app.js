@@ -1,5 +1,7 @@
 const STORAGE_KEY = "arquivo-claro-catalog-v1";
 const EMAIL_CONFIG_KEY = "arquivo-claro-email-config-v1";
+const APP_SETTINGS_KEY = "arquivo-claro-settings-v1";
+const HANDLE_DB_NAME = "arquivo-claro-handles";
 const API_BASE = location.protocol === "file:" ? "http://localhost:8787" : "";
 
 const state = {
@@ -8,6 +10,11 @@ const state = {
   objectUrls: new Map(),
   serverCatalogReady: false,
   syncTimer: null,
+  checkedDirectoryHandle: null,
+  settings: {
+    checkedFolderName: "",
+    checkedPathHint: "",
+  },
   filters: {
     search: "",
     type: "all",
@@ -63,6 +70,7 @@ const els = {
   emailProvider: document.querySelector("#emailProvider"),
   emailAddress: document.querySelector("#emailAddress"),
   emailPassword: document.querySelector("#emailPassword"),
+  rememberEmailPassword: document.querySelector("#rememberEmailPassword"),
   imapHost: document.querySelector("#imapHost"),
   imapPort: document.querySelector("#imapPort"),
   manualImap: document.querySelector("#manualImap"),
@@ -72,8 +80,15 @@ const els = {
   mailboxSelect: document.querySelector("#mailboxSelect"),
   testEmailBtn: document.querySelector("#testEmailBtn"),
   importEmailBtn: document.querySelector("#importEmailBtn"),
+  saveEmailSettingsBtn: document.querySelector("#saveEmailSettingsBtn"),
+  forgetEmailSettingsBtn: document.querySelector("#forgetEmailSettingsBtn"),
   emailStatus: document.querySelector("#emailStatus"),
   emailDiagnostics: document.querySelector("#emailDiagnostics"),
+  checkedFolderName: document.querySelector("#checkedFolderName"),
+  checkedFolderStatus: document.querySelector("#checkedFolderStatus"),
+  checkedPathHint: document.querySelector("#checkedPathHint"),
+  chooseCheckedFolderBtn: document.querySelector("#chooseCheckedFolderBtn"),
+  saveSettingsBtn: document.querySelector("#saveSettingsBtn"),
   folderTree: document.querySelector("#folderTree"),
   folderCount: document.querySelector("#folderCount"),
   openFoldersBtn: document.querySelector("#openFoldersBtn"),
@@ -105,6 +120,99 @@ function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(cleanFiles));
   els.saveStatus.textContent = "Salvo no navegador";
   scheduleCatalogSync();
+}
+
+function safeEncode(value) {
+  try {
+    return btoa(unescape(encodeURIComponent(value || "")));
+  } catch {
+    return "";
+  }
+}
+
+function safeDecode(value) {
+  try {
+    return decodeURIComponent(escape(atob(value || "")));
+  } catch {
+    return "";
+  }
+}
+
+function loadAppSettings() {
+  try {
+    const settings = JSON.parse(localStorage.getItem(APP_SETTINGS_KEY) || "{}");
+    state.settings = {
+      checkedFolderName: settings.checkedFolderName || "",
+      checkedPathHint: settings.checkedPathHint || "",
+    };
+    els.checkedPathHint.value = state.settings.checkedPathHint;
+  } catch {
+    localStorage.removeItem(APP_SETTINGS_KEY);
+  }
+  renderSettings();
+}
+
+function saveAppSettings() {
+  state.settings.checkedPathHint = els.checkedPathHint.value.trim();
+  localStorage.setItem(APP_SETTINGS_KEY, JSON.stringify(state.settings));
+  renderSettings();
+}
+
+function renderSettings() {
+  const folderName = state.settings.checkedFolderName || "Nenhuma pasta escolhida";
+  els.checkedFolderName.textContent = folderName;
+  if (state.checkedDirectoryHandle) {
+    els.checkedFolderStatus.textContent = "Destino ativo. Arquivos conferidos serão copiados para esta pasta.";
+  } else if ("showDirectoryPicker" in window) {
+    els.checkedFolderStatus.textContent = "Escolha uma pasta do Google Drive, OneDrive ou do computador para ativar o salvamento automático.";
+  } else {
+    els.checkedFolderStatus.textContent = "Este navegador não permite salvar direto em pasta local. Use Chrome ou Edge atualizado.";
+  }
+}
+
+function openHandleDb() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(HANDLE_DB_NAME, 1);
+    request.onupgradeneeded = () => request.result.createObjectStore("handles");
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function setStoredHandle(key, value) {
+  const db = await openHandleDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("handles", "readwrite");
+    tx.objectStore("handles").put(value, key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function getStoredHandle(key) {
+  const db = await openHandleDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("handles", "readonly");
+    const request = tx.objectStore("handles").get(key);
+    request.onsuccess = () => resolve(request.result || null);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function loadCheckedFolderHandle() {
+  if (!("showDirectoryPicker" in window)) {
+    renderSettings();
+    return;
+  }
+  try {
+    const handle = await getStoredHandle("checkedDirectory");
+    if (!handle) return;
+    state.checkedDirectoryHandle = handle;
+    state.settings.checkedFolderName = state.settings.checkedFolderName || handle.name;
+    renderSettings();
+  } catch {
+    state.checkedDirectoryHandle = null;
+  }
 }
 
 function mergeCatalogFiles(localFiles, serverFiles) {
@@ -164,6 +272,10 @@ function loadEmailConfig() {
     const config = JSON.parse(localStorage.getItem(EMAIL_CONFIG_KEY) || "{}");
     if (config.provider) els.emailProvider.value = config.provider;
     if (config.email) els.emailAddress.value = config.email;
+    if (config.rememberPassword && config.password) {
+      els.rememberEmailPassword.checked = true;
+      els.emailPassword.value = safeDecode(config.password);
+    }
     if (config.host) els.imapHost.value = config.host;
     if (config.port) els.imapPort.value = config.port;
     if (typeof config.unreadOnly === "boolean") els.unreadOnly.checked = config.unreadOnly;
@@ -180,11 +292,14 @@ function loadEmailConfig() {
 }
 
 function saveEmailConfig() {
+  const rememberPassword = els.rememberEmailPassword.checked;
   localStorage.setItem(
     EMAIL_CONFIG_KEY,
     JSON.stringify({
       provider: els.emailProvider.value,
       email: els.emailAddress.value,
+      rememberPassword,
+      password: rememberPassword ? safeEncode(els.emailPassword.value) : "",
       host: els.imapHost.value,
       port: els.imapPort.value,
       unreadOnly: els.unreadOnly.checked,
@@ -193,6 +308,13 @@ function saveEmailConfig() {
       mailbox: els.mailboxSelect.value,
     }),
   );
+}
+
+function forgetEmailPassword() {
+  els.emailPassword.value = "";
+  els.rememberEmailPassword.checked = false;
+  saveEmailConfig();
+  showToast("Senha removida deste navegador.");
 }
 
 function showToast(message) {
@@ -259,6 +381,96 @@ function cleanFolderName(value, fallback) {
     .replace(/[\\/:*?"<>|]+/g, "-")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function safeFileName(value, fallback = "arquivo") {
+  return cleanFolderName(value, fallback).replace(/\.+$/g, "") || fallback;
+}
+
+async function requestWritePermission(handle) {
+  if (!handle) return false;
+  const options = { mode: "readwrite" };
+  if ((await handle.queryPermission(options)) === "granted") return true;
+  return (await handle.requestPermission(options)) === "granted";
+}
+
+async function chooseCheckedFolder() {
+  if (!("showDirectoryPicker" in window)) {
+    showToast("Use Chrome ou Edge atualizado para escolher uma pasta do Drive.");
+    return;
+  }
+  try {
+    const handle = await window.showDirectoryPicker({ mode: "readwrite" });
+    const allowed = await requestWritePermission(handle);
+    if (!allowed) {
+      showToast("Permissão negada para salvar na pasta.");
+      return;
+    }
+    state.checkedDirectoryHandle = handle;
+    state.settings.checkedFolderName = handle.name;
+    saveAppSettings();
+    await setStoredHandle("checkedDirectory", handle);
+    showToast("Pasta de conferidos configurada.");
+  } catch (error) {
+    if (error?.name !== "AbortError") showToast("Não consegui configurar a pasta de destino.");
+  }
+}
+
+async function getWritableFileName(directory, name) {
+  const parsed = name.match(/^(.*?)(\.[^.]+)?$/);
+  const base = safeFileName(parsed?.[1] || name, "arquivo");
+  const ext = parsed?.[2] || "";
+  for (let index = 0; index < 100; index += 1) {
+    const candidate = index ? `${base} (${index})${ext}` : `${base}${ext}`;
+    try {
+      await directory.getFileHandle(candidate, { create: false });
+    } catch {
+      return candidate;
+    }
+  }
+  return `${base}-${Date.now()}${ext}`;
+}
+
+async function fileBlob(file) {
+  const objectUrl = state.objectUrls.get(file.id);
+  const url = objectUrl || serverFileUrl(file);
+  if (!url) throw new Error("Arquivo sem origem disponivel");
+  const response = await fetch(url);
+  if (!response.ok) throw new Error("Nao consegui ler o arquivo");
+  return response.blob();
+}
+
+async function saveCheckedFileToDrive(file) {
+  if (!file || file.status !== "conferido") return;
+  if (!state.checkedDirectoryHandle) {
+    showToast("Arquivo conferido. Escolha a pasta de destino para salvar automaticamente no Drive.");
+    return;
+  }
+
+  const allowed = await requestWritePermission(state.checkedDirectoryHandle);
+  if (!allowed) {
+    showToast("Arquivo conferido, mas falta permissão para gravar na pasta.");
+    return;
+  }
+
+  try {
+    const supplierDir = await state.checkedDirectoryHandle.getDirectoryHandle(safeFileName(file.client, "Sem cliente"), { create: true });
+    const periodDir = await supplierDir.getDirectoryHandle(safeFileName(file.period, "Sem periodo"), { create: true });
+    const blob = await fileBlob(file);
+    const targetName = await getWritableFileName(periodDir, file.name);
+    const fileHandle = await periodDir.getFileHandle(targetName, { create: true });
+    const writable = await fileHandle.createWritable();
+    await writable.write(blob);
+    await writable.close();
+
+    file.checkedSavedAt = new Date().toISOString();
+    file.checkedSavedPath = `${state.settings.checkedFolderName || "Pasta escolhida"}/${safeFileName(file.client, "Sem cliente")}/${safeFileName(file.period, "Sem periodo")}/${targetName}`;
+    saveState();
+    render();
+    showToast("Arquivo conferido salvo na pasta configurada.");
+  } catch {
+    showToast("Arquivo conferido, mas não consegui copiar para a pasta configurada.");
+  }
 }
 
 function inferType(file) {
@@ -389,6 +601,9 @@ async function addFiles(fileList) {
 }
 
 function suggestedPath(file) {
+  if (file.checkedSavedPath && file.status === "conferido") {
+    return file.checkedSavedPath;
+  }
   if (file.originalPath && /^[A-Z]:\\/i.test(file.originalPath)) {
     return file.originalPath;
   }
@@ -622,9 +837,13 @@ function render() {
 function updateSelected(patch) {
   const file = selectedFile();
   if (!file) return;
+  const previousStatus = file.status;
   Object.assign(file, patch);
   saveState();
   render();
+  if (patch.status === "conferido" && previousStatus !== "conferido") {
+    saveCheckedFileToDrive(file);
+  }
 }
 
 function downloadText(filename, text, type) {
@@ -786,7 +1005,7 @@ async function testEmailAccess() {
   } finally {
     els.testEmailBtn.disabled = false;
     els.testEmailBtn.textContent = "Testar acesso";
-    els.emailPassword.value = "";
+    if (!els.rememberEmailPassword.checked) els.emailPassword.value = "";
   }
 }
 
@@ -861,7 +1080,7 @@ async function importFromEmail() {
   } finally {
     els.importEmailBtn.disabled = false;
     els.importEmailBtn.textContent = "Buscar notas fiscais";
-    els.emailPassword.value = "";
+    if (!els.rememberEmailPassword.checked) els.emailPassword.value = "";
   }
 }
 
@@ -1025,6 +1244,16 @@ function bindEvents() {
   els.exportCsvBtn.addEventListener("click", exportCsv);
   els.exportVobiBtn.addEventListener("click", exportVobiPackage);
   els.testEmailBtn.addEventListener("click", testEmailAccess);
+  els.saveEmailSettingsBtn.addEventListener("click", () => {
+    saveEmailConfig();
+    showToast("Configuração do e-mail salva neste navegador.");
+  });
+  els.forgetEmailSettingsBtn.addEventListener("click", forgetEmailPassword);
+  els.chooseCheckedFolderBtn.addEventListener("click", chooseCheckedFolder);
+  els.saveSettingsBtn.addEventListener("click", () => {
+    saveAppSettings();
+    showToast("Destino dos conferidos salvo.");
+  });
   els.exportJsonBtn.addEventListener("click", exportJson);
   els.copyPlanBtn.addEventListener("click", copyPlan);
   els.importJsonInput.addEventListener("change", (event) => {
@@ -1049,9 +1278,11 @@ function bindEvents() {
     renderEmailMode();
     saveEmailConfig();
   });
-  [els.emailAddress, els.imapHost, els.imapPort, els.emailLimit].forEach((input) => {
+  [els.emailAddress, els.emailPassword, els.imapHost, els.imapPort, els.emailLimit].forEach((input) => {
     input.addEventListener("input", saveEmailConfig);
   });
+  els.checkedPathHint.addEventListener("input", saveAppSettings);
+  els.rememberEmailPassword.addEventListener("change", saveEmailConfig);
   els.mailboxSelect.addEventListener("change", saveEmailConfig);
   [els.unreadOnly, els.markSeen].forEach((input) => {
     input.addEventListener("change", saveEmailConfig);
@@ -1060,8 +1291,10 @@ function bindEvents() {
 }
 
 loadState();
+loadAppSettings();
 loadEmailConfig();
 bindEvents();
 render();
 checkServerStatus();
 loadServerCatalog();
+loadCheckedFolderHandle();
