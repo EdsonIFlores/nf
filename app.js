@@ -1,6 +1,7 @@
 const STORAGE_KEY = "arquivo-claro-catalog-v1";
 const EMAIL_CONFIG_KEY = "arquivo-claro-email-config-v1";
 const APP_SETTINGS_KEY = "arquivo-claro-settings-v1";
+const AUTO_EMAIL_KEY = "fiscalflow-auto-email-v1";
 const HANDLE_DB_NAME = "arquivo-claro-handles";
 const API_BASE = location.protocol === "file:" ? "http://localhost:8787" : "";
 
@@ -10,6 +11,8 @@ const state = {
   objectUrls: new Map(),
   serverCatalogReady: false,
   syncTimer: null,
+  autoEmailTimer: null,
+  activeTab: "inicio",
   checkedDirectoryHandle: null,
   serverStatus: {
     online: false,
@@ -104,6 +107,16 @@ const els = {
   folderModal: document.querySelector("#folderModal"),
   folderModalList: document.querySelector("#folderModalList"),
   toast: document.querySelector("#toast"),
+  tabLinks: document.querySelectorAll("[data-tab]"),
+  tabSections: document.querySelectorAll("[data-tab-section]"),
+  quickEmailSummary: document.querySelector("#quickEmailSummary"),
+  quickEmailHint: document.querySelector("#quickEmailHint"),
+  autoEmailSearch: document.querySelector("#autoEmailSearch"),
+  autoEmailInterval: document.querySelector("#autoEmailInterval"),
+  quickTestEmailBtn: document.querySelector("#quickTestEmailBtn"),
+  quickImportEmailBtn: document.querySelector("#quickImportEmailBtn"),
+  checkedFolderTree: document.querySelector("#checkedFolderTree"),
+  checkedFolderCount: document.querySelector("#checkedFolderCount"),
 };
 
 function uid() {
@@ -179,6 +192,70 @@ function renderSettings() {
   renderSupport();
 }
 
+function loadAutoEmailSettings() {
+  try {
+    const config = JSON.parse(localStorage.getItem(AUTO_EMAIL_KEY) || "{}");
+    els.autoEmailSearch.checked = Boolean(config.enabled);
+    if (config.interval) els.autoEmailInterval.value = String(config.interval);
+  } catch {
+    localStorage.removeItem(AUTO_EMAIL_KEY);
+  }
+  setupAutoEmailSearch();
+  renderQuickEmailSummary();
+}
+
+function saveAutoEmailSettings() {
+  localStorage.setItem(
+    AUTO_EMAIL_KEY,
+    JSON.stringify({
+      enabled: els.autoEmailSearch.checked,
+      interval: Number(els.autoEmailInterval.value || 30),
+    }),
+  );
+  setupAutoEmailSearch();
+  renderQuickEmailSummary();
+}
+
+function renderQuickEmailSummary() {
+  const email = els.emailAddress.value.trim();
+  const provider = els.emailProvider.selectedOptions?.[0]?.textContent || "Provedor não definido";
+  const hasPassword = Boolean(els.emailPassword.value);
+  els.quickEmailSummary.textContent = email ? `${email} - ${provider}` : "Nenhum e-mail salvo";
+  if (!email) {
+    els.quickEmailHint.textContent = "Abra a aba Configurar e-mail, informe os dados e salve.";
+  } else if (!hasPassword) {
+    els.quickEmailHint.textContent = "Senha não carregada. Marque a opção de lembrar senha para permitir busca automática.";
+  } else if (els.autoEmailSearch.checked) {
+    els.quickEmailHint.textContent = `Busca automática ativa a cada ${els.autoEmailInterval.value} minuto(s).`;
+  } else {
+    els.quickEmailHint.textContent = "Configuração pronta para buscar manualmente pela tela Início.";
+  }
+}
+
+function setupAutoEmailSearch() {
+  window.clearInterval(state.autoEmailTimer);
+  state.autoEmailTimer = null;
+  if (!els.autoEmailSearch.checked) return;
+  const minutes = Math.max(Number(els.autoEmailInterval.value || 30), 5);
+  state.autoEmailTimer = window.setInterval(() => {
+    const payload = emailPayload();
+    if (!payload.email || !payload.password) return;
+    importFromEmail({ silent: true });
+  }, minutes * 60 * 1000);
+}
+
+function switchTab(tab) {
+  state.activeTab = tab;
+  els.tabLinks.forEach((button) => {
+    button.classList.toggle("active", button.dataset.tab === tab);
+  });
+  els.tabSections.forEach((section) => {
+    const tabs = String(section.dataset.tabSection || "").split(/\s+/);
+    section.classList.toggle("hidden", !tabs.includes(tab));
+  });
+  render();
+}
+
 function supportRows() {
   const providerLabel = els.emailProvider?.selectedOptions?.[0]?.textContent || "Não configurado";
   const email = els.emailAddress?.value?.trim() || "Não configurado";
@@ -215,7 +292,7 @@ function renderSupport() {
 
 async function copySupportReport() {
   const report = [
-    "Arquivo Claro - Diagnóstico",
+    "FiscalFlow - Diagnóstico",
     `Data: ${new Date().toLocaleString("pt-BR")}`,
     ...supportRows().map(([label, value]) => `${label}: ${value}`),
   ].join("\n");
@@ -362,6 +439,7 @@ function saveEmailConfig() {
     }),
   );
   renderSupport();
+  renderQuickEmailSummary();
 }
 
 function forgetEmailPassword() {
@@ -782,6 +860,47 @@ function renderFolderTree(files) {
 
   renderTarget(els.folderTree, true);
   renderTarget(els.folderModalList, false);
+  renderCheckedFolderTree();
+}
+
+function renderCheckedFolderTree() {
+  if (!els.checkedFolderTree) return;
+  const checkedFiles = state.files.filter((file) => file.status === "conferido");
+  const groups = new Map();
+  checkedFiles.forEach((file) => {
+    const key = folderKey(file);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(file);
+  });
+  els.checkedFolderCount.textContent = `${groups.size} pasta${groups.size === 1 ? "" : "s"}`;
+  els.checkedFolderTree.innerHTML = "";
+
+  if (!groups.size) {
+    els.checkedFolderTree.innerHTML = `<div class="folder-row"><div class="folder-label"><span class="folder-icon" aria-hidden="true"></span><div><strong>Nenhuma nota conferida</strong><span>Marque arquivos como Conferido para liberar download por pasta.</span></div></div></div>`;
+    return;
+  }
+
+  const fragment = document.createDocumentFragment();
+  [...groups.entries()].sort(([a], [b]) => a.localeCompare(b)).forEach(([key, group]) => {
+    const row = document.createElement("div");
+    row.className = "folder-row ready-folder";
+    const title = folderTitle(key, group);
+    row.innerHTML = `
+      <div class="folder-label">
+        <span class="folder-icon" aria-hidden="true"></span>
+        <div>
+          <strong>${escapeHtml(title)}</strong>
+          <span>${group.length} conferido${group.length === 1 ? "" : "s"} - pronto para baixar</span>
+        </div>
+      </div>
+      <div class="folder-actions">
+        <button class="primary-btn" type="button" data-checked-folder="${escapeHtml(key)}">Baixar conferidos</button>
+        <button class="line-btn" type="button" data-archive-folder="${escapeHtml(key)}">Arquivar</button>
+      </div>
+    `;
+    fragment.appendChild(row);
+  });
+  els.checkedFolderTree.appendChild(fragment);
 }
 
 function renderTable(files) {
@@ -1108,10 +1227,10 @@ function isUnsupportedZohoMailbox(payload) {
   return isZoho && /^conversation history\b/i.test(payload.mailbox || "");
 }
 
-async function importFromEmail() {
+async function importFromEmail(options = {}) {
   const payload = emailPayload();
   if (!payload.email || !payload.password || (els.emailProvider.value === "manual" && !payload.host)) {
-    showToast("Preencha e-mail, senha e servidor quando for manual.");
+    if (!options.silent) showToast("Preencha e-mail, senha e servidor quando for manual.");
     return;
   }
   if (isUnsupportedZohoMailbox(payload)) {
@@ -1122,13 +1241,15 @@ async function importFromEmail() {
       ["Correção", "use INBOX ou pasta normal fora do Conversation History"],
     ]);
     renderSupport();
-    showToast("Troque a pasta do e-mail para INBOX ou Notas fiscais.");
+    if (!options.silent) showToast("Troque a pasta do e-mail para INBOX ou Notas fiscais.");
     return;
   }
 
   saveEmailConfig();
   els.importEmailBtn.disabled = true;
+  els.quickImportEmailBtn.disabled = true;
   els.importEmailBtn.textContent = "Buscando...";
+  els.quickImportEmailBtn.textContent = "Buscando...";
   els.emailStatus.textContent = "Conectando ao e-mail e procurando anexos PDF/XML.";
   renderDiagnostics([
     ["Acesso ao e-mail", "conectando"],
@@ -1164,7 +1285,7 @@ async function importFromEmail() {
       ["Duplicados ignorados", data.duplicates ?? 0],
       ["Outros anexos ignorados", data.ignoredAttachments ?? 0],
     ]);
-    showToast(`${data.imported} anexo(s) importado(s). ${data.duplicates || 0} duplicado(s) ignorado(s).`);
+    if (!options.silent) showToast(`${data.imported} anexo(s) importado(s). ${data.duplicates || 0} duplicado(s) ignorado(s).`);
   } catch (error) {
     state.lastEmailStatus = "Falhou ao importar";
     els.emailStatus.textContent = error.message || "Não consegui conectar ao e-mail.";
@@ -1172,12 +1293,15 @@ async function importFromEmail() {
       ["Acesso ao e-mail", "falhou"],
       ["Busca de PDFs/XMLs", "não realizada"],
     ]);
-    showToast(error.message || "Não consegui importar do e-mail.");
+    if (!options.silent) showToast(error.message || "Não consegui importar do e-mail.");
   } finally {
     els.importEmailBtn.disabled = false;
+    els.quickImportEmailBtn.disabled = false;
     els.importEmailBtn.textContent = "Buscar notas fiscais";
+    els.quickImportEmailBtn.textContent = "Buscar agora";
     if (!els.rememberEmailPassword.checked) els.emailPassword.value = "";
     renderSupport();
+    renderQuickEmailSummary();
   }
 }
 
@@ -1222,13 +1346,15 @@ function bindEvents() {
 
   const handleFolderAction = async (event) => {
     const button = event.target.closest("button[data-folder]");
+    const checkedButton = event.target.closest("button[data-checked-folder]");
     const archiveButton = event.target.closest("button[data-archive-folder]");
-    if (button) {
-      const key = button.dataset.folder;
-      const files = filteredFiles().filter((file) => folderKey(file) === key);
+    if (button || checkedButton) {
+      const key = button?.dataset.folder || checkedButton?.dataset.checkedFolder;
+      const files = (checkedButton ? state.files.filter((file) => file.status === "conferido") : filteredFiles()).filter((file) => folderKey(file) === key);
       const title = folderTitle(key, files);
-      button.disabled = true;
-      button.textContent = "Baixando...";
+      const activeButton = button || checkedButton;
+      activeButton.disabled = true;
+      activeButton.textContent = "Baixando...";
       try {
         const safeName = title.replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, "-");
         await downloadZip(files, safeName + ".zip");
@@ -1236,8 +1362,8 @@ function bindEvents() {
       } catch {
         showToast("Não consegui baixar essa pasta.");
       } finally {
-        button.disabled = false;
-        button.textContent = "Baixar pasta";
+        activeButton.disabled = false;
+        activeButton.textContent = checkedButton ? "Baixar conferidos" : "Baixar pasta";
       }
       return;
     }
@@ -1253,6 +1379,7 @@ function bindEvents() {
   };
 
   els.folderTree.addEventListener("click", handleFolderAction);
+  els.checkedFolderTree.addEventListener("click", handleFolderAction);
   els.folderModalList.addEventListener("click", handleFolderAction);
   els.openFoldersBtn.addEventListener("click", () => els.folderModal.classList.remove("hidden"));
   els.closeFoldersBtn.addEventListener("click", () => els.folderModal.classList.add("hidden"));
@@ -1341,6 +1468,7 @@ function bindEvents() {
   els.exportCsvBtn.addEventListener("click", exportCsv);
   els.exportVobiBtn.addEventListener("click", exportVobiPackage);
   els.testEmailBtn.addEventListener("click", testEmailAccess);
+  els.quickTestEmailBtn.addEventListener("click", testEmailAccess);
   els.saveEmailSettingsBtn.addEventListener("click", () => {
     saveEmailConfig();
     showToast("Configuração do e-mail salva neste navegador.");
@@ -1386,13 +1514,21 @@ function bindEvents() {
     input.addEventListener("change", saveEmailConfig);
   });
   els.importEmailBtn.addEventListener("click", importFromEmail);
+  els.quickImportEmailBtn.addEventListener("click", importFromEmail);
+  els.autoEmailSearch.addEventListener("change", saveAutoEmailSettings);
+  els.autoEmailInterval.addEventListener("change", saveAutoEmailSettings);
+  els.tabLinks.forEach((button) => {
+    button.addEventListener("click", () => switchTab(button.dataset.tab));
+  });
 }
 
 loadState();
 loadAppSettings();
 loadEmailConfig();
+loadAutoEmailSettings();
 bindEvents();
 render();
+switchTab("inicio");
 checkServerStatus();
 loadServerCatalog();
 loadCheckedFolderHandle();

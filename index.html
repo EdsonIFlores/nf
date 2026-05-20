@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Arquivo Claro - Organizador de PDF e XML</title>
+    <title>FiscalFlow - Organizador de notas fiscais</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -11,19 +11,21 @@
       <div class="system-brand">
         <img src="assets/tec-pro-logo.png" alt="TEC-PRO Soluções em Tecnologia" />
         <div>
-          <strong>Arquivo Claro</strong>
-          <span>Organização fiscal inteligente</span>
+          <strong>FiscalFlow</strong>
+          <span>FiscalFlow - Organização fiscal inteligente</span>
         </div>
       </div>
       <nav class="system-nav" aria-label="Navegação principal">
-        <a href="#dropZone">Início</a>
-        <a href="#emailProvider">E-mail</a>
-        <a href="#folderTree">Pastas</a>
-        <a href="#supportList">Suporte</a>
+        <button class="tab-link active" type="button" data-tab="inicio">Início</button>
+        <button class="tab-link" type="button" data-tab="email">Configurar e-mail</button>
+        <button class="tab-link" type="button" data-tab="salvamento">Salvamento</button>
+        <button class="tab-link" type="button" data-tab="pastas">Pastas</button>
+        <button class="tab-link" type="button" data-tab="backup">Backup</button>
+        <button class="tab-link" type="button" data-tab="suporte">Suporte</button>
       </nav>
       <a
         class="whatsapp-btn"
-        href="https://wa.me/5577998581607?text=Ol%C3%A1%2C%20preciso%20de%20suporte%20no%20sistema%20Arquivo%20Claro."
+        href="https://wa.me/5577998581607?text=Ol%C3%A1%2C%20preciso%20de%20suporte%20no%20sistema%20FiscalFlow."
         target="_blank"
         rel="noreferrer"
       >
@@ -36,8 +38,8 @@
         <div class="brand">
           <div class="brand-mark" aria-hidden="true">AC</div>
           <div>
-            <h1>Arquivo Claro</h1>
-            <p>PDFs e XMLs no lugar certo.</p>
+            <h1>FiscalFlow</h1>
+            <p>Notas, PDFs e XMLs no lugar certo.</p>
           </div>
         </div>
 
@@ -49,7 +51,7 @@
             <p>Programador responsável - TEC-PRO Soluções em Tecnologia</p>
           </div>
           <a
-            href="https://wa.me/5577998581607?text=Ol%C3%A1%2C%20preciso%20de%20suporte%20no%20sistema%20Arquivo%20Claro."
+            href="https://wa.me/5577998581607?text=Ol%C3%A1%2C%20preciso%20de%20suporte%20no%20sistema%20FiscalFlow."
             target="_blank"
             rel="noreferrer"
           >
@@ -57,7 +59,7 @@
           </a>
         </section>
 
-        <section class="drop-zone" id="dropZone">
+        <section class="drop-zone tab-section" id="dropZone" data-tab-section="inicio">
           <input id="fileInput" type="file" accept=".pdf,.xml,application/pdf,text/xml,application/xml" multiple />
           <input id="folderInput" type="file" accept=".pdf,.xml,application/pdf,text/xml,application/xml" webkitdirectory multiple />
           <div class="drop-icon" aria-hidden="true">+</div>
@@ -69,9 +71,40 @@
           </div>
         </section>
 
-        <section class="panel compact email-panel">
-          <h2>Importar do e-mail</h2>
-          <p class="helper-text">Funciona online com IMAP. Para Gmail, Outlook, Yahoo e alguns provedores, use senha de app.</p>
+        <section class="panel compact quick-email-panel tab-section" data-tab-section="inicio">
+          <div class="section-title">
+            <span class="section-icon" aria-hidden="true">↻</span>
+            <div>
+              <h2>Busca diária no e-mail</h2>
+              <p class="helper-text">Use a configuração salva para buscar notas fiscais rapidamente.</p>
+            </div>
+          </div>
+          <div class="setting-card">
+            <span>E-mail configurado</span>
+            <strong id="quickEmailSummary">Nenhum e-mail salvo</strong>
+            <p class="helper-text" id="quickEmailHint">Configure e salve o e-mail antes de ativar a busca automática.</p>
+          </div>
+          <label class="check-row subtle-check">
+            <input id="autoEmailSearch" type="checkbox" />
+            <span>Buscar automaticamente enquanto o sistema estiver aberto</span>
+          </label>
+          <label>
+            <span>Intervalo da busca automática</span>
+            <select id="autoEmailInterval">
+              <option value="15">A cada 15 minutos</option>
+              <option value="30" selected>A cada 30 minutos</option>
+              <option value="60">A cada 1 hora</option>
+            </select>
+          </label>
+          <div class="drop-actions">
+            <button id="quickTestEmailBtn" class="line-btn" type="button">Testar e-mail salvo</button>
+            <button id="quickImportEmailBtn" class="primary-btn" type="button">Buscar agora</button>
+          </div>
+        </section>
+
+        <section class="panel compact email-panel tab-section hidden" data-tab-section="email">
+          <h2>Configuração do e-mail</h2>
+          <p class="helper-text">Configure uma vez e salve. Depois o usuário pode buscar as notas pela tela Início.</p>
           <label>
             <span>Provedor</span>
             <select id="emailProvider">
@@ -144,7 +177,7 @@
           <div class="email-diagnostics" id="emailDiagnostics" aria-live="polite"></div>
         </section>
 
-        <section class="panel compact settings-panel">
+        <section class="panel compact settings-panel tab-section hidden" data-tab-section="salvamento">
           <div class="section-title">
             <span class="section-icon" aria-hidden="true">✓</span>
             <div>
@@ -168,7 +201,7 @@
           <p class="helper-text">No modo online, o navegador precisa pedir permissão para gravar na pasta escolhida. Isso evita salvar arquivos no lugar errado.</p>
         </section>
 
-        <section class="summary-grid" aria-label="Indicadores">
+        <section class="summary-grid tab-section" aria-label="Indicadores" data-tab-section="inicio">
           <article>
             <span>Total</span>
             <strong id="totalCount">0</strong>
@@ -195,7 +228,7 @@
           </article>
         </section>
 
-        <section class="panel compact support-panel">
+        <section class="panel compact support-panel tab-section hidden" data-tab-section="suporte">
           <div class="section-title">
             <span class="section-icon support" aria-hidden="true">i</span>
             <div>
@@ -206,7 +239,7 @@
           <div class="support-list" id="supportList"></div>
           <a
             class="support-whatsapp"
-            href="https://wa.me/5577998581607?text=Ol%C3%A1%2C%20preciso%20de%20suporte%20no%20sistema%20Arquivo%20Claro."
+            href="https://wa.me/5577998581607?text=Ol%C3%A1%2C%20preciso%20de%20suporte%20no%20sistema%20FiscalFlow."
             target="_blank"
             rel="noreferrer"
           >
@@ -215,8 +248,9 @@
           <button id="copySupportBtn" class="line-btn" type="button">Copiar diagnóstico</button>
         </section>
 
-        <section class="panel compact">
-          <h2>Exportar</h2>
+        <section class="panel compact tab-section hidden" data-tab-section="backup">
+          <h2>Backup e restauração</h2>
+          <p class="helper-text">Faça backup do catálogo, restaure registros e exporte os pacotes quando precisar.</p>
           <button id="exportCsvBtn" class="line-btn" type="button">Baixar planilha CSV</button>
           <button id="exportVobiBtn" class="primary-btn" type="button">Baixar pacote Vobi</button>
           <button id="exportJsonBtn" class="line-btn" type="button">Baixar backup JSON</button>
@@ -230,10 +264,10 @@
       </aside>
 
       <section class="workspace">
-        <header class="topbar">
+        <header class="topbar tab-section" data-tab-section="inicio">
           <div>
-            <p class="eyebrow">Catálogo local</p>
-            <h2>Organize por cliente, período, tipo e status</h2>
+            <p class="eyebrow">Painel inicial</p>
+            <h2>Rotina diária de notas fiscais, boletos e XMLs</h2>
           </div>
           <div class="topbar-actions">
             <button class="folder-open-btn" id="openFoldersBtn" type="button" aria-haspopup="dialog">
@@ -244,7 +278,7 @@
           </div>
         </header>
 
-        <section class="toolbar" aria-label="Filtros">
+        <section class="toolbar tab-section" aria-label="Filtros" data-tab-section="inicio pastas">
           <label class="search-field">
             <span>Buscar</span>
             <input id="searchInput" type="search" placeholder="Nome, cliente, CNPJ, chave, tag..." />
@@ -279,7 +313,7 @@
           </label>
         </section>
 
-        <section class="panel folder-panel">
+        <section class="panel folder-panel tab-section hidden" data-tab-section="pastas">
           <div class="panel-heading">
             <h2>Pastas criadas</h2>
             <span id="folderCount">0 pastas</span>
@@ -287,7 +321,16 @@
           <div class="folder-tree" id="folderTree"></div>
         </section>
 
-        <section class="content-grid">
+        <section class="panel folder-panel tab-section hidden" data-tab-section="pastas">
+          <div class="panel-heading">
+            <h2>Notas conferidas prontas para baixar</h2>
+            <span id="checkedFolderCount">0 pastas</span>
+          </div>
+          <p class="helper-text">Aqui aparecem somente arquivos marcados como Conferido. Use para baixar para o Drive, nuvem ou pasta local.</p>
+          <div class="folder-tree" id="checkedFolderTree"></div>
+        </section>
+
+        <section class="content-grid tab-section" data-tab-section="inicio pastas">
           <section class="panel table-panel">
             <div class="panel-heading">
               <h2>Arquivos</h2>
@@ -409,7 +452,7 @@
 
     <a
       class="floating-support"
-      href="https://wa.me/5577998581607?text=Ol%C3%A1%2C%20preciso%20de%20suporte%20no%20sistema%20Arquivo%20Claro."
+      href="https://wa.me/5577998581607?text=Ol%C3%A1%2C%20preciso%20de%20suporte%20no%20sistema%20FiscalFlow."
       target="_blank"
       rel="noreferrer"
       aria-label="Solicitar suporte pelo WhatsApp"
@@ -418,7 +461,7 @@
     </a>
 
     <footer class="app-footer">
-      <span>Arquivo Claro</span>
+      <span>FiscalFlow</span>
       <strong>TEC-PRO Soluções em Tecnologia</strong>
       <span>Desenvolvido por Edson Flores</span>
     </footer>
