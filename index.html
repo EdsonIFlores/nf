@@ -7,6 +7,30 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
+    <header class="system-header">
+      <div class="system-brand">
+        <img src="assets/tec-pro-logo.png" alt="TEC-PRO Soluções em Tecnologia" />
+        <div>
+          <strong>Arquivo Claro</strong>
+          <span>Organização fiscal inteligente</span>
+        </div>
+      </div>
+      <nav class="system-nav" aria-label="Navegação principal">
+        <a href="#dropZone">Início</a>
+        <a href="#emailProvider">E-mail</a>
+        <a href="#folderTree">Pastas</a>
+        <a href="#supportList">Suporte</a>
+      </nav>
+      <a
+        class="whatsapp-btn"
+        href="https://wa.me/5577998581607?text=Ol%C3%A1%2C%20preciso%20de%20suporte%20no%20sistema%20Arquivo%20Claro."
+        target="_blank"
+        rel="noreferrer"
+      >
+        Suporte WhatsApp
+      </a>
+    </header>
+
     <main class="app-shell">
       <aside class="sidebar" aria-label="Resumo">
         <div class="brand">
@@ -16,6 +40,22 @@
             <p>PDFs e XMLs no lugar certo.</p>
           </div>
         </div>
+
+        <section class="developer-card">
+          <img src="assets/tec-pro-logo.png" alt="TEC-PRO Soluções em Tecnologia" />
+          <div>
+            <span>Desenvolvido por</span>
+            <strong>Edson Flores</strong>
+            <p>Programador responsável - TEC-PRO Soluções em Tecnologia</p>
+          </div>
+          <a
+            href="https://wa.me/5577998581607?text=Ol%C3%A1%2C%20preciso%20de%20suporte%20no%20sistema%20Arquivo%20Claro."
+            target="_blank"
+            rel="noreferrer"
+          >
+            Solicitar suporte
+          </a>
+        </section>
 
         <section class="drop-zone" id="dropZone">
           <input id="fileInput" type="file" accept=".pdf,.xml,application/pdf,text/xml,application/xml" multiple />
@@ -164,6 +204,14 @@
             </div>
           </div>
           <div class="support-list" id="supportList"></div>
+          <a
+            class="support-whatsapp"
+            href="https://wa.me/5577998581607?text=Ol%C3%A1%2C%20preciso%20de%20suporte%20no%20sistema%20Arquivo%20Claro."
+            target="_blank"
+            rel="noreferrer"
+          >
+            Chamar suporte no WhatsApp
+          </a>
           <button id="copySupportBtn" class="line-btn" type="button">Copiar diagnóstico</button>
         </section>
 
@@ -358,6 +406,22 @@
         </section>
       </section>
     </main>
+
+    <a
+      class="floating-support"
+      href="https://wa.me/5577998581607?text=Ol%C3%A1%2C%20preciso%20de%20suporte%20no%20sistema%20Arquivo%20Claro."
+      target="_blank"
+      rel="noreferrer"
+      aria-label="Solicitar suporte pelo WhatsApp"
+    >
+      Suporte
+    </a>
+
+    <footer class="app-footer">
+      <span>Arquivo Claro</span>
+      <strong>TEC-PRO Soluções em Tecnologia</strong>
+      <span>Desenvolvido por Edson Flores</span>
+    </footer>
 
     <div class="modal-backdrop hidden" id="folderModal" role="dialog" aria-modal="true" aria-labelledby="folderModalTitle">
       <section class="modal-panel">
