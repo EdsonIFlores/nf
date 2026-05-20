@@ -16,10 +16,10 @@
         </div>
       </div>
       <nav class="system-nav" aria-label="Navegação principal">
-        <button class="tab-link active" type="button" data-tab="email">Configurar e-mail</button>
+        <button class="tab-link active" type="button" data-tab="inicio">Início</button>
+        <button class="tab-link" type="button" data-tab="email">Configurar e-mail</button>
         <button class="tab-link" type="button" data-tab="salvamento">Salvamento</button>
-        <button class="tab-link" type="button" data-tab="busca">Buscar arquivos</button>
-        <button class="tab-link" type="button" data-tab="conferidos">Conferidos</button>
+        <button class="tab-link" type="button" data-tab="pastas">Pastas</button>
         <button class="tab-link" type="button" data-tab="backup">Backup</button>
         <button class="tab-link" type="button" data-tab="suporte">Suporte</button>
       </nav>
@@ -59,34 +59,7 @@
           </a>
         </section>
 
-        <nav class="side-menu" aria-label="Menu do sistema">
-          <button class="tab-link active" type="button" data-tab="email">
-            <span>1</span>
-            Configurar e-mail
-          </button>
-          <button class="tab-link" type="button" data-tab="salvamento">
-            <span>2</span>
-            Salvamento
-          </button>
-          <button class="tab-link" type="button" data-tab="busca">
-            <span>3</span>
-            Buscar arquivos
-          </button>
-          <button class="tab-link" type="button" data-tab="conferidos">
-            <span>4</span>
-            Conferidos
-          </button>
-          <button class="tab-link" type="button" data-tab="backup">
-            <span>5</span>
-            Backup
-          </button>
-          <button class="tab-link" type="button" data-tab="suporte">
-            <span>6</span>
-            Suporte
-          </button>
-        </nav>
-
-        <section class="drop-zone tab-section" id="dropZone" data-tab-section="busca">
+        <section class="drop-zone tab-section" id="dropZone" data-tab-section="inicio">
           <input id="fileInput" type="file" accept=".pdf,.xml,application/pdf,text/xml,application/xml" multiple />
           <input id="folderInput" type="file" accept=".pdf,.xml,application/pdf,text/xml,application/xml" webkitdirectory multiple />
           <div class="drop-icon" aria-hidden="true">+</div>
@@ -98,7 +71,7 @@
           </div>
         </section>
 
-        <section class="panel compact quick-email-panel tab-section" data-tab-section="busca">
+        <section class="panel compact quick-email-panel tab-section" data-tab-section="inicio">
           <div class="section-title">
             <span class="section-icon" aria-hidden="true">↻</span>
             <div>
@@ -228,7 +201,7 @@
           <p class="helper-text">No modo online, o navegador precisa pedir permissão para gravar na pasta escolhida. Isso evita salvar arquivos no lugar errado.</p>
         </section>
 
-        <section class="summary-grid tab-section" aria-label="Indicadores" data-tab-section="busca">
+        <section class="summary-grid tab-section" aria-label="Indicadores" data-tab-section="inicio">
           <article>
             <span>Total</span>
             <strong id="totalCount">0</strong>
@@ -291,14 +264,10 @@
       </aside>
 
       <section class="workspace">
-        <header class="topbar tab-section" data-tab-section="busca">
+        <header class="topbar tab-section" data-tab-section="inicio">
           <div>
-            <p class="eyebrow">Buscar arquivos</p>
-            <h2>Tratamento diário de notas fiscais, boletos e XMLs</h2>
-            <div class="run-context">
-              <span id="activeEmailInfo">E-mail não configurado</span>
-              <span id="currentDateTime">--/--/---- --:--</span>
-            </div>
+            <p class="eyebrow">Painel inicial</p>
+            <h2>Rotina diária de notas fiscais, boletos e XMLs</h2>
           </div>
           <div class="topbar-actions">
             <button class="folder-open-btn" id="openFoldersBtn" type="button" aria-haspopup="dialog">
@@ -309,7 +278,7 @@
           </div>
         </header>
 
-        <section class="toolbar tab-section" aria-label="Filtros" data-tab-section="busca conferidos">
+        <section class="toolbar tab-section" aria-label="Filtros" data-tab-section="inicio pastas">
           <label class="search-field">
             <span>Buscar</span>
             <input id="searchInput" type="search" placeholder="Nome, cliente, CNPJ, chave, tag..." />
@@ -344,7 +313,7 @@
           </label>
         </section>
 
-        <section class="panel folder-panel tab-section hidden" data-tab-section="conferidos">
+        <section class="panel folder-panel tab-section hidden" data-tab-section="pastas">
           <div class="panel-heading">
             <h2>Pastas criadas</h2>
             <span id="folderCount">0 pastas</span>
@@ -352,7 +321,7 @@
           <div class="folder-tree" id="folderTree"></div>
         </section>
 
-        <section class="panel folder-panel tab-section hidden" data-tab-section="conferidos">
+        <section class="panel folder-panel tab-section hidden" data-tab-section="pastas">
           <div class="panel-heading">
             <h2>Notas conferidas prontas para baixar</h2>
             <span id="checkedFolderCount">0 pastas</span>
@@ -361,7 +330,7 @@
           <div class="folder-tree" id="checkedFolderTree"></div>
         </section>
 
-        <section class="content-grid tab-section" data-tab-section="busca conferidos">
+        <section class="content-grid tab-section" data-tab-section="inicio pastas">
           <section class="panel table-panel">
             <div class="panel-heading">
               <h2>Arquivos</h2>

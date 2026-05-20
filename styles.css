@@ -98,7 +98,7 @@ label.import-backup {
 }
 
 .system-nav {
-  display: none;
+  display: flex;
   align-items: center;
   gap: 4px;
 }
@@ -209,70 +209,6 @@ label.import-backup {
   background: #6ce9a6;
 }
 
-.side-menu {
-  display: grid;
-  gap: 8px;
-  padding: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.side-menu .tab-link {
-  display: grid;
-  grid-template-columns: 28px 1fr;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  min-height: 44px;
-  padding: 8px 10px;
-  text-align: left;
-  color: #dbe8ee;
-  background: transparent;
-}
-
-.side-menu .tab-link span {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 7px;
-  color: #0b5f89;
-  background: #dff6ff;
-  font-size: 0.78rem;
-  font-weight: 900;
-}
-
-.side-menu .tab-link:hover,
-.side-menu .tab-link.active {
-  color: #fff;
-  background: rgba(22, 135, 189, 0.30);
-  box-shadow: inset 3px 0 0 #f4a51c;
-}
-
-.workspace-screen {
-  width: 100%;
-}
-
-.run-context {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 9px;
-}
-
-.run-context span {
-  display: inline-flex;
-  align-items: center;
-  min-height: 28px;
-  padding: 0 10px;
-  border: 1px solid #d9e3ed;
-  border-radius: 999px;
-  color: #344054;
-  background: #f8fbff;
-  font-size: 0.82rem;
-  font-weight: 750;
-}
 
 .app-shell {
   display: grid;
