@@ -1,16 +1,23 @@
-# Arquivo Claro
+# FiscalFlow
 
-Aplicativo local para organizar arquivos PDF e XML em um catálogo pesquisável.
+Aplicativo para organizar arquivos PDF e XML de notas fiscais, boletos e documentos fiscais em um catálogo pesquisável.
+
+Desenvolvido por **Edson Flores - TEC-PRO Soluções em Tecnologia**.
+
+## Documentos de entrega
+
+- Manual do cliente: `docs/MANUAL_CLIENTE_FISCALFLOW.md`
+- Checklist de entrega: `docs/CHECKLIST_ENTREGA_CLIENTE.md`
 
 ## Como abrir
 
 Para usar somente a organização manual, abra `index.html` no navegador.
 
-Para importar notas fiscais direto do e-mail e criar pastas reais no computador:
+Para importar notas fiscais direto do e-mail e criar pastas reais no computador ou servidor:
 
 1. Abra `iniciar-arquivo-claro.bat`.
 2. Use o endereço `http://localhost:8787`.
-3. No painel "Importar do e-mail", informe provedor, e-mail e senha.
+3. Na aba "Configurar e-mail", informe provedor, e-mail e senha de app.
 4. Clique em "Buscar notas fiscais".
 
 As notas baixadas ficam em `NotasFiscais/Nome do fornecedor/AAAA-MM`.

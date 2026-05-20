@@ -71,6 +71,23 @@
           </div>
         </section>
 
+        <section class="panel compact onboarding-panel tab-section" data-tab-section="inicio">
+          <div class="section-title">
+            <span class="section-icon support" aria-hidden="true">1</span>
+            <div>
+              <h2>Primeiros passos</h2>
+              <p class="helper-text">Siga esta ordem para deixar o sistema pronto para uso no dia a dia.</p>
+            </div>
+          </div>
+          <ol class="onboarding-list">
+            <li><strong>Configurar e-mail</strong><span>Informe Gmail, Zoho ou IMAP manual e teste o acesso.</span></li>
+            <li><strong>Configurar salvamento</strong><span>Escolha a pasta local, Google Drive ou OneDrive sincronizado.</span></li>
+            <li><strong>Buscar arquivos</strong><span>Importe PDFs e XMLs do e-mail ou adicione uma pasta manualmente.</span></li>
+            <li><strong>Conferir documentos</strong><span>Abra, ajuste fornecedor, período, status e marque como Conferido.</span></li>
+            <li><strong>Fazer backup</strong><span>Baixe backup JSON, planilha CSV ou pacote Vobi quando precisar.</span></li>
+          </ol>
+        </section>
+
         <section class="panel compact quick-email-panel tab-section" data-tab-section="inicio">
           <div class="section-title">
             <span class="section-icon" aria-hidden="true">↻</span>
@@ -149,6 +166,10 @@
             <label class="check-row">
               <input id="unreadOnly" type="checkbox" checked />
               <span>Só não lidos</span>
+            </label>
+            <label class="check-row">
+              <input id="scanReadAfterUnread" type="checkbox" />
+              <span>2ª varredura em lidos</span>
             </label>
             <label class="check-row">
               <input id="markSeen" type="checkbox" />
@@ -441,7 +462,6 @@
 
               <div class="detail-actions">
                 <a id="openFileLink" class="line-btn hidden" href="#" target="_blank" rel="noreferrer">Abrir arquivo</a>
-                <button id="duplicateBtn" class="line-btn" type="button">Duplicar registro</button>
                 <button id="deleteBtn" class="danger-btn" type="button">Remover</button>
               </div>
             </form>
