@@ -88,6 +88,13 @@ function textMatch(text, pattern) {
   return match ? match[1].trim() : "";
 }
 
+function normalizeText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
 function readXmlMetadata(buffer) {
   const text = buffer.toString("utf8");
   const emitBlock = textMatch(text, /<emit\b[^>]*>([\s\S]*?)<\/emit>/i);
@@ -105,12 +112,20 @@ function readXmlMetadata(buffer) {
     textMatch(ideBlock, /<dhEmi>([\s\S]*?)<\/dhEmi>/i) ||
     textMatch(ideBlock, /<dEmi>([\s\S]*?)<\/dEmi>/i);
   const key = infId || textMatch(text, /<chNFe>([\s\S]*?)<\/chNFe>/i);
+  const fiscalType =
+    /<infNFe\b|<nfeProc\b|<NFe\b/i.test(text) ? "NFe" :
+    /<CompNfse\b|<Nfse\b|<InfNfse\b|<ListaNfse\b/i.test(text) ? "NFSe" :
+    /<infCte\b|<cteProc\b|<CTe\b/i.test(text) ? "CTe" :
+    /<infMDFe\b|<mdfeProc\b|<MDFe\b/i.test(text) ? "MDFe" :
+    "";
 
   return {
     client,
     cnpj,
     key,
     period: dateText ? dateText.slice(0, 7) : "",
+    fiscalType,
+    isFiscalXml: Boolean(fiscalType || key),
   };
 }
 
@@ -280,12 +295,50 @@ async function writeCatalog(files) {
   return catalog;
 }
 
-function detectDocumentKind({ fileName, subject, type, xmlMetadata }) {
-  const text = `${fileName || ""} ${subject || ""}`.toLowerCase();
+function fiscalSignalText({ fileName, subject, bodyText }) {
+  return normalizeText(`${fileName || ""} ${subject || ""} ${bodyText || ""}`);
+}
+
+function hasFiscalSignal(text) {
+  return [
+    /\bnota\s*fiscal\b/,
+    /\bnf[-\s]?e\b/,
+    /\bnfs[-\s]?e\b/,
+    /\bnfse\b/,
+    /\bnfe\b/,
+    /\bdanfe\b/,
+    /\bdacte\b/,
+    /\bct[-\s]?e\b/,
+    /\bcte\b/,
+    /\bmdf[-\s]?e\b/,
+    /\bmdfe\b/,
+    /chave\s*de\s*acesso/,
+    /\bxml\s*(da|de)?\s*(nota|nfe|nfse)\b/,
+    /documento\s*auxiliar\s*(da)?\s*nota/,
+    /\brps\b/,
+    /prefeitura.*nota/,
+    /emissao.*nota/,
+    /numero.*nota/,
+    /servico.*nota/,
+  ].some((pattern) => pattern.test(text));
+}
+
+function isFiscalAttachmentCandidate({ attachment, mail, type, xmlMetadata }) {
+  if (type === "xml" && xmlMetadata?.isFiscalXml) return true;
+  const text = fiscalSignalText({
+    fileName: attachment.filename,
+    subject: mail.subject,
+    bodyText: `${mail.text || ""} ${mail.html || ""}`,
+  });
+  return hasFiscalSignal(text);
+}
+
+function detectDocumentKind({ fileName, subject, bodyText, type, xmlMetadata }) {
+  const text = fiscalSignalText({ fileName, subject, bodyText });
   if (text.includes("boleto") || text.includes("fatura") || text.includes("cobranca") || text.includes("cobrança") || text.includes("pix")) {
     return { kind: "Boleto", category: "Financeiro", folder: "Boletos" };
   }
-  if (type === "xml" || xmlMetadata?.key || text.includes("nfe") || text.includes("nf-e") || text.includes("nota")) {
+  if (type === "xml" || xmlMetadata?.key || xmlMetadata?.isFiscalXml || hasFiscalSignal(text)) {
     return { kind: "Nota fiscal", category: "Fiscal", folder: "Notas Fiscais" };
   }
   return { kind: "Documento", category: "Outros", folder: "Outros" };
@@ -351,6 +404,7 @@ async function saveAttachment(attachment, mail, config) {
   const document = detectDocumentKind({
     fileName: attachment.filename,
     subject: mail.subject,
+    bodyText: `${mail.text || ""} ${mail.html || ""}`,
     type,
     xmlMetadata,
   });
@@ -411,6 +465,7 @@ async function importFromEmail(input) {
   let scannedAttachments = 0;
   let acceptedAttachments = 0;
   let ignoredAttachments = 0;
+  let ignoredNotFiscal = 0;
 
   await client.connect();
   try {
@@ -431,6 +486,12 @@ async function importFromEmail(input) {
             scannedAttachments += 1;
             if (!isSupportedAttachment(attachment)) {
               ignoredAttachments += 1;
+              continue;
+            }
+            const type = path.extname(attachment.filename || "").toLowerCase().slice(1);
+            const xmlMetadata = type === "xml" ? readXmlMetadata(attachment.content) : {};
+            if (!isFiscalAttachmentCandidate({ attachment, mail, type, xmlMetadata })) {
+              ignoredNotFiscal += 1;
               continue;
             }
             acceptedAttachments += 1;
@@ -459,6 +520,7 @@ async function importFromEmail(input) {
     scannedAttachments,
     acceptedAttachments,
     ignoredAttachments,
+    ignoredNotFiscal,
     imported: records.length,
     duplicates,
     files: records,

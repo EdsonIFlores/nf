@@ -68,7 +68,6 @@ const els = {
   notesInput: document.querySelector("#notesInput"),
   pathPreview: document.querySelector("#pathPreview"),
   openFileLink: document.querySelector("#openFileLink"),
-  duplicateBtn: document.querySelector("#duplicateBtn"),
   deleteBtn: document.querySelector("#deleteBtn"),
   exportCsvBtn: document.querySelector("#exportCsvBtn"),
   exportVobiBtn: document.querySelector("#exportVobiBtn"),
@@ -84,6 +83,7 @@ const els = {
   imapPort: document.querySelector("#imapPort"),
   manualImap: document.querySelector("#manualImap"),
   unreadOnly: document.querySelector("#unreadOnly"),
+  scanReadAfterUnread: document.querySelector("#scanReadAfterUnread"),
   markSeen: document.querySelector("#markSeen"),
   emailLimit: document.querySelector("#emailLimit"),
   mailboxSelect: document.querySelector("#mailboxSelect"),
@@ -409,6 +409,7 @@ function loadEmailConfig() {
     if (config.host) els.imapHost.value = config.host;
     if (config.port) els.imapPort.value = config.port;
     if (typeof config.unreadOnly === "boolean") els.unreadOnly.checked = config.unreadOnly;
+    if (typeof config.scanReadAfterUnread === "boolean") els.scanReadAfterUnread.checked = config.scanReadAfterUnread;
     if (typeof config.markSeen === "boolean") els.markSeen.checked = config.markSeen;
     if (config.limit) els.emailLimit.value = config.limit;
     if (config.mailbox) {
@@ -433,6 +434,7 @@ function saveEmailConfig() {
       host: els.imapHost.value,
       port: els.imapPort.value,
       unreadOnly: els.unreadOnly.checked,
+      scanReadAfterUnread: els.scanReadAfterUnread.checked,
       markSeen: els.markSeen.checked,
       limit: els.emailLimit.value,
       mailbox: els.mailboxSelect.value,
@@ -1281,6 +1283,7 @@ async function importFromEmail(options = {}) {
       ["Mensagens verificadas", data.checked ?? 0],
       ["Anexos analisados", data.scannedAttachments ?? 0],
       ["PDF/XML encontrados", data.acceptedAttachments ?? 0],
+      ["PDF/XML sem sinal fiscal", data.ignoredNotFiscal ?? 0],
       ["Importados", data.imported ?? 0],
       ["Duplicados ignorados", data.duplicates ?? 0],
       ["Outros anexos ignorados", data.ignoredAttachments ?? 0],
