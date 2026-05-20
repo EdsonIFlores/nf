@@ -820,6 +820,10 @@ body {
   border-top: 4px solid #0e9384;
 }
 
+.support-panel {
+  border-top: 4px solid #475467;
+}
+
 .section-title {
   display: grid;
   grid-template-columns: 38px 1fr;
@@ -836,6 +840,43 @@ body {
   color: #fff;
   background: linear-gradient(135deg, #0e9384, #155eef);
   font-weight: 800;
+}
+
+.section-icon.support {
+  background: linear-gradient(135deg, #475467, #155eef);
+  font-family: Georgia, "Times New Roman", serif;
+  font-style: italic;
+}
+
+.support-list {
+  display: grid;
+  gap: 7px;
+}
+
+.support-row {
+  display: grid;
+  grid-template-columns: minmax(92px, 0.8fr) minmax(0, 1.2fr);
+  gap: 8px;
+  align-items: center;
+  padding: 9px 10px;
+  border: 1px solid #d9e2ef;
+  border-radius: 8px;
+  background: #f8fbff;
+}
+
+.support-row span {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.support-row strong {
+  min-width: 0;
+  color: #101828;
+  font-size: 0.86rem;
+  overflow-wrap: anywhere;
 }
 
 .setting-card {

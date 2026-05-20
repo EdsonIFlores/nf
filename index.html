@@ -46,7 +46,7 @@
               <option value="locaweb">Locaweb</option>
               <option value="kinghost">KingHost</option>
               <option value="zoho">Zoho pessoal</option>
-              <option value="zohopro">Zoho dominio proprio (imappro)</option>
+              <option value="zohopro">Zoho domínio próprio (imappro)</option>
               <option value="manual">Manual</option>
             </select>
           </label>
@@ -153,6 +153,18 @@
             <span>Boletos</span>
             <strong id="billCount">0</strong>
           </article>
+        </section>
+
+        <section class="panel compact support-panel">
+          <div class="section-title">
+            <span class="section-icon support" aria-hidden="true">i</span>
+            <div>
+              <h2>Suporte e diagnóstico</h2>
+              <p class="helper-text">Resumo rápido para saber se o sistema está pronto para importar, salvar e exportar.</p>
+            </div>
+          </div>
+          <div class="support-list" id="supportList"></div>
+          <button id="copySupportBtn" class="line-btn" type="button">Copiar diagnóstico</button>
         </section>
 
         <section class="panel compact">
@@ -333,7 +345,7 @@
 
               <div class="path-preview">
                 <span>Destino sugerido</span>
-                <strong id="pathPreview">Cliente/Periodo/Tipo/Status/arquivo</strong>
+                <strong id="pathPreview">Cliente/Período/Tipo/Status/arquivo</strong>
               </div>
 
               <div class="detail-actions">

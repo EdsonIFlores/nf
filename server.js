@@ -299,13 +299,17 @@ function dayFromDate(value) {
 
 function resolveConfig(input) {
   const preset = PROVIDERS[input.provider] || providerFromEmail(input.email) || {};
+  const mailbox = input.mailbox || "INBOX";
+  if (/^conversation history\b/i.test(mailbox)) {
+    throw new Error("A pasta Conversation History do Zoho não aceita busca de anexos fiscais. Selecione INBOX ou crie uma pasta normal chamada Notas fiscais fora do Conversation History.");
+  }
   return {
     host: input.host || preset.host,
     port: Number(input.port || preset.port || 993),
     secure: input.secure !== false,
     email: input.email,
     password: input.password,
-    mailbox: input.mailbox || "INBOX",
+    mailbox,
     limit: Math.min(Math.max(Number(input.limit || 50), 1), 300),
     unreadOnly: Boolean(input.unreadOnly),
     markSeen: Boolean(input.markSeen),
@@ -449,7 +453,7 @@ async function importFromEmail(input) {
   return {
     ok: true,
     outputDir: OUTPUT_DIR,
-    mode: config.unreadOnly ? "Somente nao lidos" : "Todos os e-mails recentes",
+    mode: config.unreadOnly ? "Somente não lidos" : "Todos os e-mails recentes",
     available,
     checked,
     scannedAttachments,
@@ -466,8 +470,8 @@ function publicEmailError(error) {
   const technical = message.replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+/g, "[email]");
   if (/command failed/i.test(message)) {
     return {
-      error: "O servidor IMAP recusou a operacao.",
-      hint: "Teste novamente. Para Zoho com dominio proprio, use o provedor Zoho dominio proprio ou Manual com imappro.zoho.com, porta 993, SSL ativo. Para Gmail, use senha de app e provedor Gmail.",
+      error: "O servidor IMAP recusou a operação.",
+      hint: "No Zoho, selecione INBOX ou uma pasta normal de e-mails. Evite Conversation History. Para domínio próprio use imappro.zoho.com, porta 993, SSL ativo.",
       technical,
     };
   }
@@ -479,18 +483,18 @@ function publicEmailError(error) {
     };
   }
   if (/certificate|self.signed|ssl|tls/i.test(message)) {
-    return { error: "Falha de seguranca SSL/TLS ao conectar no IMAP.", hint: "Confira servidor imappro.zoho.com para Zoho com dominio proprio, porta 993 e SSL ativo.", technical };
+    return { error: "Falha de segurança SSL/TLS ao conectar no IMAP.", hint: "Confira servidor imappro.zoho.com para Zoho com domínio próprio, porta 993 e SSL ativo.", technical };
   }
   if (/timeout|timed out|etimedout/i.test(message)) {
     return { error: "Tempo esgotado ao conectar no IMAP.", hint: "Confira servidor, porta e se o Zoho permite acesso IMAP externo.", technical };
   }
   if (/ENOTFOUND|getaddrinfo|dns/i.test(message)) {
-    return { error: "Servidor IMAP nao encontrado.", hint: "Para Zoho com dominio proprio use imappro.zoho.com na porta 993.", technical };
+    return { error: "Servidor IMAP não encontrado.", hint: "Para Zoho com domínio próprio use imappro.zoho.com na porta 993.", technical };
   }
   if (/ECONNREFUSED|ECONNRESET|socket/i.test(message)) {
-    return { error: "Conexao recusada ou interrompida pelo servidor IMAP.", hint: "Confira porta 993, SSL e liberacao de IMAP no Zoho.", technical };
+    return { error: "Conexão recusada ou interrompida pelo servidor IMAP.", hint: "Confira porta 993, SSL e liberação de IMAP no Zoho.", technical };
   }
-  return { error: message, hint: "Confira servidor IMAP, porta, SSL, senha de aplicativo e permissao IMAP da conta.", technical };
+  return { error: message, hint: "Confira servidor IMAP, porta, SSL, senha de aplicativo e permissão IMAP da conta.", technical };
 }
 
 function createImapClient(config) {
@@ -612,7 +616,7 @@ async function testEmailAccess(input) {
       totalMessages,
       unreadMessages,
       mailboxes,
-      mode: config.unreadOnly ? "Pronto para buscar apenas nao lidos" : "Pronto para buscar e-mails recentes",
+      mode: config.unreadOnly ? "Pronto para buscar apenas não lidos" : "Pronto para buscar e-mails recentes",
     };
   } finally {
     await client.logout().catch(() => {});

@@ -11,6 +11,12 @@ const state = {
   serverCatalogReady: false,
   syncTimer: null,
   checkedDirectoryHandle: null,
+  serverStatus: {
+    online: false,
+    outputDir: "",
+    catalogFile: "",
+  },
+  lastEmailStatus: "Ainda não testado",
   settings: {
     checkedFolderName: "",
     checkedPathHint: "",
@@ -89,6 +95,8 @@ const els = {
   checkedPathHint: document.querySelector("#checkedPathHint"),
   chooseCheckedFolderBtn: document.querySelector("#chooseCheckedFolderBtn"),
   saveSettingsBtn: document.querySelector("#saveSettingsBtn"),
+  supportList: document.querySelector("#supportList"),
+  copySupportBtn: document.querySelector("#copySupportBtn"),
   folderTree: document.querySelector("#folderTree"),
   folderCount: document.querySelector("#folderCount"),
   openFoldersBtn: document.querySelector("#openFoldersBtn"),
@@ -168,6 +176,51 @@ function renderSettings() {
   } else {
     els.checkedFolderStatus.textContent = "Este navegador não permite salvar direto em pasta local. Use Chrome ou Edge atualizado.";
   }
+  renderSupport();
+}
+
+function supportRows() {
+  const providerLabel = els.emailProvider?.selectedOptions?.[0]?.textContent || "Não configurado";
+  const email = els.emailAddress?.value?.trim() || "Não configurado";
+  const mailbox = els.mailboxSelect?.value || "INBOX";
+  const checkedFolder = state.settings.checkedFolderName || state.settings.checkedPathHint || "Não configurada";
+  const storage = state.serverStatus.online ? "Servidor online e catálogo sincronizado" : "Somente navegador/local";
+  return [
+    ["Servidor do app", state.serverStatus.online ? "online" : "indisponível"],
+    ["Pasta principal", state.serverStatus.outputDir || "Não informada"],
+    ["Catálogo", storage],
+    ["E-mail", email],
+    ["Provedor", providerLabel],
+    ["Pasta do e-mail", mailbox],
+    ["Último teste do e-mail", state.lastEmailStatus],
+    ["Destino dos conferidos", checkedFolder],
+    ["Arquivos no catálogo", String(state.files.length)],
+    ["Pendentes", String(state.files.filter((file) => file.status === "pendente").length)],
+    ["Conferidos", String(state.files.filter((file) => file.status === "conferido").length)],
+  ];
+}
+
+function renderSupport() {
+  if (!els.supportList) return;
+  const fragment = document.createDocumentFragment();
+  supportRows().forEach(([label, value]) => {
+    const row = document.createElement("div");
+    row.className = "support-row";
+    row.innerHTML = `<span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong>`;
+    fragment.appendChild(row);
+  });
+  els.supportList.innerHTML = "";
+  els.supportList.appendChild(fragment);
+}
+
+async function copySupportReport() {
+  const report = [
+    "Arquivo Claro - Diagnóstico",
+    `Data: ${new Date().toLocaleString("pt-BR")}`,
+    ...supportRows().map(([label, value]) => `${label}: ${value}`),
+  ].join("\n");
+  await navigator.clipboard.writeText(report);
+  showToast("Diagnóstico copiado para enviar ao suporte.");
 }
 
 function openHandleDb() {
@@ -239,7 +292,7 @@ async function syncCatalogToServer() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ files: cleanCatalogFiles() }),
     });
-    if (!response.ok) throw new Error("Falha ao salvar catalogo");
+    if (!response.ok) throw new Error("Falha ao salvar catálogo");
     els.saveStatus.textContent = "Salvo no servidor";
   } catch {
     els.saveStatus.textContent = "Salvo no navegador";
@@ -249,7 +302,7 @@ async function syncCatalogToServer() {
 async function loadServerCatalog() {
   try {
     const response = await fetch(`${API_BASE}/api/catalog`);
-    if (!response.ok) throw new Error("Catalogo indisponivel");
+    if (!response.ok) throw new Error("Catálogo indisponível");
     const data = await response.json();
     const serverFiles = Array.isArray(data.files) ? data.files : [];
     state.serverCatalogReady = true;
@@ -308,6 +361,7 @@ function saveEmailConfig() {
       mailbox: els.mailboxSelect.value,
     }),
   );
+  renderSupport();
 }
 
 function forgetEmailPassword() {
@@ -436,7 +490,7 @@ async function fileBlob(file) {
   const url = objectUrl || serverFileUrl(file);
   if (!url) throw new Error("Arquivo sem origem disponivel");
   const response = await fetch(url);
-  if (!response.ok) throw new Error("Nao consegui ler o arquivo");
+  if (!response.ok) throw new Error("Não consegui ler o arquivo");
   return response.blob();
 }
 
@@ -832,6 +886,7 @@ function render() {
   renderFolderTree(files);
   renderTable(files);
   renderDetail();
+  renderSupport();
 }
 
 function updateSelected(patch) {
@@ -863,7 +918,7 @@ function toCsvValue(value) {
 }
 
 function exportCsv() {
-  const headers = ["Arquivo", "Documento", "Tipo", "Tamanho", "Cliente", "Periodo", "Categoria", "Status", "Tags", "CNPJ", "Chave", "Origem", "Destino sugerido", "Observacoes"];
+  const headers = ["Arquivo", "Documento", "Tipo", "Tamanho", "Cliente", "Período", "Categoria", "Status", "Tags", "CNPJ", "Chave", "Origem", "Destino sugerido", "Observações"];
   const rows = state.files.map((file) => [
     file.name,
     file.documentKind || "",
@@ -930,7 +985,7 @@ function exportJson() {
 async function importJson(file) {
   try {
     const data = JSON.parse(await file.text());
-    if (!Array.isArray(data)) throw new Error("Formato invalido");
+    if (!Array.isArray(data)) throw new Error("Formato inválido");
     state.files = data.map((item) => ({ ...item, id: item.id || uid() }));
     state.selectedId = state.files[0]?.id || null;
     saveState();
@@ -949,20 +1004,39 @@ function renderEmailMode() {
 async function checkServerStatus() {
   try {
     const response = await fetch(`${API_BASE}/api/status`);
-    if (!response.ok) throw new Error("Servidor local indisponivel");
+    if (!response.ok) throw new Error("Servidor local indisponível");
     const data = await response.json();
+    state.serverStatus = {
+      online: true,
+      outputDir: data.outputDir || "",
+      catalogFile: data.catalogFile || "",
+    };
     els.emailStatus.textContent = `Pronto para salvar em: ${data.outputDir}`;
     els.importEmailBtn.disabled = false;
   } catch {
+    state.serverStatus = { online: false, outputDir: "", catalogFile: "" };
     els.emailStatus.textContent = "Servidor indisponível. Publique online ou execute com npm start.";
     els.importEmailBtn.disabled = false;
   }
+  renderSupport();
 }
 
 async function testEmailAccess() {
   const payload = emailPayload();
   if (!payload.email || !payload.password || (els.emailProvider.value === "manual" && !payload.host)) {
     showToast("Preencha e-mail, senha e servidor quando for manual.");
+    return;
+  }
+  if (isUnsupportedZohoMailbox(payload)) {
+    state.lastEmailStatus = "Pasta do Zoho não recomendada";
+    els.emailStatus.textContent = "O acesso ao Zoho pode estar correto, mas essa pasta não serve para buscar notas. Selecione INBOX ou uma pasta normal.";
+    renderDiagnostics([
+      ["Servidor", payload.host || "imappro.zoho.com"],
+      ["Pasta selecionada", payload.mailbox],
+      ["Correção", "use INBOX ou crie Notas fiscais fora do Conversation History"],
+    ]);
+    renderSupport();
+    showToast("Troque a pasta do e-mail para INBOX.");
     return;
   }
 
@@ -983,6 +1057,7 @@ async function testEmailAccess() {
     });
     const data = await response.json();
     if (!response.ok || !data.ok) throw new Error(formatErrorMessage(data, "Falha no teste de e-mail"));
+    state.lastEmailStatus = `Confirmado em ${data.host}`;
     els.emailStatus.textContent = `Acesso confirmado em ${data.host}.`;
     renderDiagnostics([
       ["Acesso ao e-mail", "confirmado"],
@@ -996,6 +1071,7 @@ async function testEmailAccess() {
     saveEmailConfig();
     showToast("Acesso ao e-mail confirmado.");
   } catch (error) {
+    state.lastEmailStatus = "Falhou";
     els.emailStatus.textContent = error.message || "Não consegui acessar o e-mail.";
     renderDiagnostics([
       ["Acesso ao e-mail", "falhou"],
@@ -1006,6 +1082,7 @@ async function testEmailAccess() {
     els.testEmailBtn.disabled = false;
     els.testEmailBtn.textContent = "Testar acesso";
     if (!els.rememberEmailPassword.checked) els.emailPassword.value = "";
+    renderSupport();
   }
 }
 
@@ -1025,10 +1102,27 @@ function emailPayload() {
   };
 }
 
+function isUnsupportedZohoMailbox(payload) {
+  const provider = els.emailProvider.value;
+  const isZoho = provider === "manual" || provider === "zoho" || provider === "zohopro" || /@.+/i.test(payload.email || "");
+  return isZoho && /^conversation history\b/i.test(payload.mailbox || "");
+}
+
 async function importFromEmail() {
   const payload = emailPayload();
   if (!payload.email || !payload.password || (els.emailProvider.value === "manual" && !payload.host)) {
     showToast("Preencha e-mail, senha e servidor quando for manual.");
+    return;
+  }
+  if (isUnsupportedZohoMailbox(payload)) {
+    state.lastEmailStatus = "Pasta do Zoho não recomendada";
+    els.emailStatus.textContent = "Essa pasta do Zoho não aceita busca de notas. Selecione INBOX ou uma pasta normal chamada Notas fiscais.";
+    renderDiagnostics([
+      ["Pasta selecionada", payload.mailbox],
+      ["Correção", "use INBOX ou pasta normal fora do Conversation History"],
+    ]);
+    renderSupport();
+    showToast("Troque a pasta do e-mail para INBOX ou Notas fiscais.");
     return;
   }
 
@@ -1057,6 +1151,7 @@ async function importFromEmail() {
     state.selectedId = incoming[0]?.id || state.selectedId;
     saveState();
     render();
+    state.lastEmailStatus = `Busca concluída: ${data.imported ?? 0} importado(s)`;
     els.emailStatus.textContent = `Busca concluída. Pasta principal: ${data.outputDir}.`;
     renderDiagnostics([
       ["Acesso ao e-mail", "confirmado"],
@@ -1071,6 +1166,7 @@ async function importFromEmail() {
     ]);
     showToast(`${data.imported} anexo(s) importado(s). ${data.duplicates || 0} duplicado(s) ignorado(s).`);
   } catch (error) {
+    state.lastEmailStatus = "Falhou ao importar";
     els.emailStatus.textContent = error.message || "Não consegui conectar ao e-mail.";
     renderDiagnostics([
       ["Acesso ao e-mail", "falhou"],
@@ -1081,6 +1177,7 @@ async function importFromEmail() {
     els.importEmailBtn.disabled = false;
     els.importEmailBtn.textContent = "Buscar notas fiscais";
     if (!els.rememberEmailPassword.checked) els.emailPassword.value = "";
+    renderSupport();
   }
 }
 
@@ -1137,7 +1234,7 @@ function bindEvents() {
         await downloadZip(files, safeName + ".zip");
         showToast("Pasta baixada.");
       } catch {
-        showToast("Nao consegui baixar essa pasta.");
+        showToast("Não consegui baixar essa pasta.");
       } finally {
         button.disabled = false;
         button.textContent = "Baixar pasta";
@@ -1229,16 +1326,16 @@ function bindEvents() {
       event.preventDefault();
       try {
         const response = await fetch(els.openFileLink.href, { method: "HEAD" });
-        if (!response.ok) throw new Error("Arquivo indisponivel");
+        if (!response.ok) throw new Error("Arquivo indisponível");
         window.open(els.openFileLink.href, "_blank", "noopener,noreferrer");
       } catch {
-        showToast("Nao encontrei esse arquivo no servidor. Ele pode ter sido removido em um novo deploy.");
+        showToast("Não encontrei esse arquivo no servidor. Ele pode ter sido removido em um novo deploy.");
       }
       return;
     }
 
     event.preventDefault();
-    showToast("Arquivo indisponivel. Importe novamente ou baixe pelo pacote/pasta.");
+    showToast("Arquivo indisponível. Importe novamente ou baixe pelo pacote/pasta.");
   });
 
   els.exportCsvBtn.addEventListener("click", exportCsv);
@@ -1256,6 +1353,7 @@ function bindEvents() {
   });
   els.exportJsonBtn.addEventListener("click", exportJson);
   els.copyPlanBtn.addEventListener("click", copyPlan);
+  els.copySupportBtn.addEventListener("click", copySupportReport);
   els.importJsonInput.addEventListener("change", (event) => {
     const [file] = event.target.files;
     if (file) importJson(file);
