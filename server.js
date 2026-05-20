@@ -168,7 +168,7 @@ function isAuthorized(req) {
 
 function requireAuth(res) {
   res.writeHead(401, {
-    "WWW-Authenticate": 'Basic realm="Arquivo Claro"',
+    "WWW-Authenticate": 'Basic realm="FiscalFlow"',
     "Content-Type": "text/plain; charset=utf-8",
   });
   res.end("Acesso protegido.");
@@ -468,6 +468,7 @@ async function importFromEmail(input) {
   let ignoredAttachments = 0;
   let ignoredNotFiscal = 0;
   let readSecondPass = 0;
+  const processedUids = new Set();
 
   await client.connect();
   try {
@@ -477,9 +478,11 @@ async function importFromEmail(input) {
         const latest = uids.slice(-config.limit);
         if (!latest.length) return;
         for await (const message of client.fetch(latest, { source: true, envelope: true, flags: true, uid: true })) {
+          if (processedUids.has(message.uid)) continue;
           if (config.unreadOnly && !secondPass && message.flags?.has("\\Seen")) continue;
           if (secondPass && !message.flags?.has("\\Seen")) continue;
 
+          processedUids.add(message.uid);
           checked += 1;
           if (secondPass) readSecondPass += 1;
           const mail = await simpleParser(message.source);
@@ -512,7 +515,7 @@ async function importFromEmail(input) {
         await processUids(unreadUids);
 
         if (config.scanReadAfterUnread) {
-          const readUids = await client.search({ seen: true });
+          const readUids = (await client.search({ seen: true })).filter((uid) => !processedUids.has(uid));
           available += readUids.length;
           await processUids(readUids, { secondPass: true });
         }
@@ -788,7 +791,7 @@ async function handle(req, res) {
 
 fsp.mkdir(OUTPUT_DIR, { recursive: true }).then(() => {
   http.createServer(handle).listen(PORT, HOST, () => {
-    console.log(`Arquivo Claro aberto na porta ${PORT}`);
+    console.log(`FiscalFlow aberto na porta ${PORT}`);
     console.log(`Pasta das notas: ${OUTPUT_DIR}`);
   });
 });

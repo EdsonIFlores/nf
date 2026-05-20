@@ -6,7 +6,7 @@ Usar Electron primeiro.
 
 ## Motivo
 
-O Arquivo Claro ja usa Node.js para:
+O FiscalFlow ja usa Node.js para:
 
 - IMAP;
 - leitura e gravacao de arquivos;
