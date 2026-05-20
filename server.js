@@ -365,6 +365,7 @@ function resolveConfig(input) {
     mailbox,
     limit: Math.min(Math.max(Number(input.limit || 50), 1), 300),
     unreadOnly: Boolean(input.unreadOnly),
+    scanReadAfterUnread: Boolean(input.scanReadAfterUnread),
     markSeen: Boolean(input.markSeen),
   };
 }
@@ -466,21 +467,21 @@ async function importFromEmail(input) {
   let acceptedAttachments = 0;
   let ignoredAttachments = 0;
   let ignoredNotFiscal = 0;
+  let readSecondPass = 0;
 
   await client.connect();
   try {
     const lock = await client.getMailboxLock(config.mailbox, { readOnly: !config.markSeen });
     try {
-      const search = config.unreadOnly ? { seen: false } : {};
-      const uids = await client.search(search);
-      available = uids.length;
-      const latest = uids.slice(-config.limit);
-      if (latest.length) {
+      const processUids = async (uids, { secondPass = false } = {}) => {
+        const latest = uids.slice(-config.limit);
+        if (!latest.length) return;
         for await (const message of client.fetch(latest, { source: true, envelope: true, flags: true, uid: true })) {
-          if (config.unreadOnly && message.flags?.has("\\Seen")) {
-            continue;
-          }
+          if (config.unreadOnly && !secondPass && message.flags?.has("\\Seen")) continue;
+          if (secondPass && !message.flags?.has("\\Seen")) continue;
+
           checked += 1;
+          if (secondPass) readSecondPass += 1;
           const mail = await simpleParser(message.source);
           for (const attachment of mail.attachments || []) {
             scannedAttachments += 1;
@@ -499,10 +500,26 @@ async function importFromEmail(input) {
             if (record?.duplicate) duplicates += 1;
             else if (record) records.push(record);
           }
-          if (config.markSeen) {
+          if (config.markSeen && !secondPass) {
             await client.messageFlagsAdd(message.uid, ["\\Seen"], { uid: true });
           }
         }
+      };
+
+      if (config.unreadOnly) {
+        const unreadUids = await client.search({ seen: false });
+        available = unreadUids.length;
+        await processUids(unreadUids);
+
+        if (config.scanReadAfterUnread) {
+          const readUids = await client.search({ seen: true });
+          available += readUids.length;
+          await processUids(readUids, { secondPass: true });
+        }
+      } else {
+        const uids = await client.search({});
+        available = uids.length;
+        await processUids(uids);
       }
     } finally {
       lock.release();
@@ -514,9 +531,10 @@ async function importFromEmail(input) {
   return {
     ok: true,
     outputDir: OUTPUT_DIR,
-    mode: config.unreadOnly ? "Somente não lidos" : "Todos os e-mails recentes",
+    mode: config.unreadOnly ? (config.scanReadAfterUnread ? "Não lidos + segunda varredura em lidos" : "Somente não lidos") : "Todos os e-mails recentes",
     available,
     checked,
+    readSecondPass,
     scannedAttachments,
     acceptedAttachments,
     ignoredAttachments,

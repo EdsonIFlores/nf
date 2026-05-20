@@ -1218,6 +1218,7 @@ function emailPayload() {
     secure: true,
     mailbox: els.mailboxSelect.value || "INBOX",
     unreadOnly: els.unreadOnly.checked,
+    scanReadAfterUnread: els.scanReadAfterUnread.checked,
     markSeen: els.markSeen.checked,
     limit: Number(els.emailLimit.value || 50),
   };
@@ -1256,7 +1257,7 @@ async function importFromEmail(options = {}) {
   renderDiagnostics([
     ["Acesso ao e-mail", "conectando"],
     ["Pasta", payload.mailbox || "INBOX"],
-    ["Filtro", payload.unreadOnly ? "somente não lidos" : "e-mails recentes"],
+    ["Filtro", payload.unreadOnly ? (payload.scanReadAfterUnread ? "não lidos + 2ª varredura em lidos" : "somente não lidos") : "e-mails recentes"],
     ["Anexos PDF/XML", "procurando"],
   ]);
 
@@ -1281,6 +1282,7 @@ async function importFromEmail(options = {}) {
       ["Modo", data.mode || "busca"],
       ["Mensagens encontradas", data.available ?? 0],
       ["Mensagens verificadas", data.checked ?? 0],
+      ["2ª varredura em lidos", data.readSecondPass ?? 0],
       ["Anexos analisados", data.scannedAttachments ?? 0],
       ["PDF/XML encontrados", data.acceptedAttachments ?? 0],
       ["PDF/XML sem sinal fiscal", data.ignoredNotFiscal ?? 0],
@@ -1417,17 +1419,6 @@ function bindEvents() {
   els.keyInput.addEventListener("input", (event) => updateSelected({ key: event.target.value }));
   els.notesInput.addEventListener("input", (event) => updateSelected({ notes: event.target.value }));
 
-  els.duplicateBtn.addEventListener("click", () => {
-    const file = selectedFile();
-    if (!file) return;
-    const copy = { ...file, id: uid(), name: `${file.name} (copia)`, importedAt: new Date().toISOString() };
-    state.files.unshift(copy);
-    state.selectedId = copy.id;
-    saveState();
-    render();
-    showToast("Registro duplicado.");
-  });
-
   els.deleteBtn.addEventListener("click", () => {
     const file = selectedFile();
     if (!file) return;
@@ -1513,7 +1504,7 @@ function bindEvents() {
   els.checkedPathHint.addEventListener("input", saveAppSettings);
   els.rememberEmailPassword.addEventListener("change", saveEmailConfig);
   els.mailboxSelect.addEventListener("change", saveEmailConfig);
-  [els.unreadOnly, els.markSeen].forEach((input) => {
+  [els.unreadOnly, els.scanReadAfterUnread, els.markSeen].forEach((input) => {
     input.addEventListener("change", saveEmailConfig);
   });
   els.importEmailBtn.addEventListener("click", importFromEmail);
