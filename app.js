@@ -117,6 +117,10 @@ const els = {
   quickImportEmailBtn: document.querySelector("#quickImportEmailBtn"),
   checkedFolderTree: document.querySelector("#checkedFolderTree"),
   checkedFolderCount: document.querySelector("#checkedFolderCount"),
+  workspace: document.querySelector(".workspace"),
+  sidebar: document.querySelector(".sidebar"),
+  activeEmailInfo: document.querySelector("#activeEmailInfo"),
+  currentDateTime: document.querySelector("#currentDateTime"),
 };
 
 function uid() {
@@ -230,6 +234,7 @@ function renderQuickEmailSummary() {
   } else {
     els.quickEmailHint.textContent = "Configuração pronta para buscar manualmente pela tela Início.";
   }
+  updateRunContext();
 }
 
 function setupAutoEmailSearch() {
@@ -254,6 +259,34 @@ function switchTab(tab) {
     section.classList.toggle("hidden", !tabs.includes(tab));
   });
   render();
+}
+
+function organizeWorkspaceScreens() {
+  const order = ["email", "salvamento", "busca", "conferidos", "backup", "suporte"];
+  const movable = [...els.sidebar.querySelectorAll(".tab-section")].sort((a, b) => {
+    const aTab = String(a.dataset.tabSection || "").split(/\s+/)[0];
+    const bTab = String(b.dataset.tabSection || "").split(/\s+/)[0];
+    return order.indexOf(aTab) - order.indexOf(bTab);
+  });
+  const firstWorkspaceNode = els.workspace.firstElementChild;
+  movable.forEach((section) => {
+    els.workspace.insertBefore(section, firstWorkspaceNode);
+    section.classList.add("workspace-screen");
+  });
+}
+
+function updateRunContext() {
+  if (els.activeEmailInfo) {
+    const email = els.emailAddress.value.trim();
+    const provider = els.emailProvider.selectedOptions?.[0]?.textContent || "";
+    els.activeEmailInfo.textContent = email ? `Acessando: ${email} (${provider})` : "E-mail não configurado";
+  }
+  if (els.currentDateTime) {
+    els.currentDateTime.textContent = new Date().toLocaleString("pt-BR", {
+      dateStyle: "short",
+      timeStyle: "short",
+    });
+  }
 }
 
 function supportRows() {
@@ -572,37 +605,57 @@ async function fileBlob(file) {
   return response.blob();
 }
 
-async function saveCheckedFileToDrive(file) {
-  if (!file || file.status !== "conferido") return;
+function managedFolderName(file) {
+  const supplier = safeFileName(file.client, "Sem fornecedor");
+  const cnpj = safeFileName(String(file.cnpj || "Sem CNPJ").replace(/\D/g, "") || "Sem CNPJ", "Sem CNPJ");
+  const date = safeFileName(file.receivedAt || file.period || new Date(file.importedAt || Date.now()).toISOString().slice(0, 10), "Sem data");
+  return `${supplier} - ${cnpj} - ${date}`;
+}
+
+async function saveManagedFileToDrive(file, kind = "conferido") {
+  if (!file) return;
   if (!state.checkedDirectoryHandle) {
-    showToast("Arquivo conferido. Escolha a pasta de destino para salvar automaticamente no Drive.");
+    showToast("Escolha a pasta de destino para salvar automaticamente no Drive.");
     return;
   }
 
   const allowed = await requestWritePermission(state.checkedDirectoryHandle);
   if (!allowed) {
-    showToast("Arquivo conferido, mas falta permissão para gravar na pasta.");
+    showToast("Falta permissão para gravar na pasta configurada.");
     return;
   }
 
   try {
-    const supplierDir = await state.checkedDirectoryHandle.getDirectoryHandle(safeFileName(file.client, "Sem cliente"), { create: true });
-    const periodDir = await supplierDir.getDirectoryHandle(safeFileName(file.period, "Sem periodo"), { create: true });
+    const rootName = kind === "arquivado" ? "Documentos arquivados" : "Documentos conferidos";
+    const rootDir = await state.checkedDirectoryHandle.getDirectoryHandle(rootName, { create: true });
+    const supplierDir = await rootDir.getDirectoryHandle(managedFolderName(file), { create: true });
     const blob = await fileBlob(file);
-    const targetName = await getWritableFileName(periodDir, file.name);
-    const fileHandle = await periodDir.getFileHandle(targetName, { create: true });
+    const targetName = await getWritableFileName(supplierDir, file.name);
+    const fileHandle = await supplierDir.getFileHandle(targetName, { create: true });
     const writable = await fileHandle.createWritable();
     await writable.write(blob);
     await writable.close();
 
-    file.checkedSavedAt = new Date().toISOString();
-    file.checkedSavedPath = `${state.settings.checkedFolderName || "Pasta escolhida"}/${safeFileName(file.client, "Sem cliente")}/${safeFileName(file.period, "Sem periodo")}/${targetName}`;
+    const savedAt = new Date().toISOString();
+    const savedPath = `${state.settings.checkedFolderName || "Pasta escolhida"}/${rootName}/${managedFolderName(file)}/${targetName}`;
+    if (kind === "arquivado") {
+      file.archivedSavedAt = savedAt;
+      file.archivedSavedPath = savedPath;
+    } else {
+      file.checkedSavedAt = savedAt;
+      file.checkedSavedPath = savedPath;
+    }
     saveState();
     render();
-    showToast("Arquivo conferido salvo na pasta configurada.");
+    showToast(kind === "arquivado" ? "Arquivo arquivado salvo no Drive." : "Arquivo conferido salvo no Drive.");
   } catch {
-    showToast("Arquivo conferido, mas não consegui copiar para a pasta configurada.");
+    showToast("Não consegui copiar o arquivo para a pasta configurada.");
   }
+}
+
+async function saveCheckedFileToDrive(file) {
+  if (!file || file.status !== "conferido") return;
+  return saveManagedFileToDrive(file, "conferido");
 }
 
 function inferType(file) {
@@ -1018,6 +1071,9 @@ function updateSelected(patch) {
   if (patch.status === "conferido" && previousStatus !== "conferido") {
     saveCheckedFileToDrive(file);
   }
+  if (patch.status === "arquivado" && previousStatus !== "arquivado") {
+    saveManagedFileToDrive(file, "arquivado");
+  }
 }
 
 function downloadText(filename, text, type) {
@@ -1369,11 +1425,13 @@ function bindEvents() {
     }
     if (archiveButton) {
       const key = archiveButton.dataset.archiveFolder;
-      state.files.forEach((file) => {
-        if (folderKey(file) === key) file.status = "arquivado";
+      const archivedFiles = state.files.filter((file) => folderKey(file) === key);
+      archivedFiles.forEach((file) => {
+        file.status = "arquivado";
       });
       saveState();
       render();
+      archivedFiles.forEach((file) => saveManagedFileToDrive(file, "arquivado"));
       showToast("Pasta marcada como arquivada.");
     }
   };
@@ -1526,9 +1584,12 @@ loadState();
 loadAppSettings();
 loadEmailConfig();
 loadAutoEmailSettings();
+organizeWorkspaceScreens();
 bindEvents();
 render();
-switchTab("inicio");
+switchTab("email");
+updateRunContext();
+window.setInterval(updateRunContext, 60000);
 checkServerStatus();
 loadServerCatalog();
 loadCheckedFolderHandle();
